@@ -1,0 +1,100 @@
+START BOT Freeze Investigation
+Tujuan:
+Melakukan audit penuh terhadap seluruh jalur eksekusi dari saat tombol START BOT ditekan sampai log [POST-STARTUP] Launching trading strategies... muncul, untuk menemukan semua operasi blocking yang menyebabkan GUI freeze, lalu memberikan rekomendasi perbaikan.
+
+1. Scope Audit
+Telusuri seluruh file di repository (gunakan git grep) untuk mencari:
+
+Fungsi / event handler tombol START BOT.
+
+Semua pemanggilan fungsi launching trading strategies, start_trading, strategy_manager.start, atau nama serupa.
+
+Semua pemanggilan MT5 API (mt5.copy_rates_from_pos, mt5.copy_rates_range, mt5.symbol_info, dll.).
+
+Semua loop (while True, for besar) yang berjalan dalam fungsi-fungsi di atas.
+
+Semua proses load data (indikator, model AI, file besar).
+
+2. Jalur Eksekusi
+Buat diagram alir dari:
+
+Event handler tombol START BOT di GUI.
+
+Fungsi yang dipanggil setelahnya.
+
+Semua fungsi yang mengarah ke Launching trading strategies.
+
+Catat file dan nomor baris untuk setiap fungsi di jalur ini.
+
+3. Profiling Durasi
+Tambahkan log timestamp (ms) sebelum dan sesudah setiap fungsi di jalur ini:
+
+python
+Copy
+Edit
+import time
+t0 = time.perf_counter()
+# ... kode ...
+print(f"[DEBUG] function_name took {(time.perf_counter() - t0)*1000:.2f} ms")
+Jalankan bot dan catat fungsi yang memakan waktu >100ms.
+
+4. Pencarian Operasi Blocking
+Periksa setiap fungsi di jalur eksekusi untuk hal-hal berikut:
+
+MT5 Calls tanpa timeout
+
+copy_rates_from_pos, copy_rates_range, symbol_info, dll.
+
+Loop berat
+
+while True tanpa sleep, for besar memproses ribuan item.
+
+I/O berat
+
+Load file besar (.pkl, .csv, .h5, .json) tanpa thread terpisah.
+
+Inisialisasi indikator
+
+Hitung ulang semua data teknikal saat start.
+
+Proses AI/ML
+
+Load model atau prediksi batch besar.
+
+5. Threading Check
+Pastikan semua proses di atas tidak berjalan di main thread.
+
+Gunakan log untuk memastikan thread yang aktif:
+
+python
+Copy
+Edit
+import threading
+print(f"[DEBUG] Running in thread: {threading.current_thread().name}")
+Jika fungsi berat berjalan di MainThread, pindahkan ke worker (threading.Thread, ThreadPoolExecutor, QThread).
+
+6. Rekomendasi Perbaikan
+Untuk setiap blocking call:
+
+Pindahkan ke worker thread → Gunakan ThreadPoolExecutor atau QThread.
+
+Batch processing → Pecah load besar menjadi beberapa batch kecil dengan sleep(0.05) antar batch.
+
+Lazy loading → Muat data hanya saat dibutuhkan, bukan semua sekaligus.
+
+Timeout → Tambahkan timeout di setiap panggilan MT5 (mt5.copy_rates_from_pos dengan pengecekan durasi).
+
+Async UI Update → Pastikan UI hanya diupdate via after() (tkinter) atau signal-slot (PyQt).
+
+7. Output Audit
+Laporan akhir harus berisi:
+
+Call stack penuh dari START BOT → Launching trading strategies.
+
+Durasi eksekusi setiap fungsi di jalur ini.
+
+Daftar fungsi/blocking call yang berjalan di main thread.
+
+Saran perbaikan per fungsi dengan kode snippet PR-ready.
+
+Estimasi waktu perbaikan (jam).

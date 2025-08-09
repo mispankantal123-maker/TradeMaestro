@@ -314,15 +314,22 @@ class TradingBot:
     def start_trading_when_ready(self) -> None:
         """Start trading loop only when explicitly called (manual start)."""
         try:
+            import time
+            start_time = time.perf_counter()
+            
             if not self.running:
                 self.logger.log(f"[TRADING] 🚀 Starting trading operations...")
                 self.running = True
                 
                 # Start main trading loop in separate thread
+                thread_start = time.perf_counter()
                 self.main_thread = threading.Thread(target=self._main_loop, daemon=True)
                 self.main_thread.start()
+                thread_elapsed = (time.perf_counter() - thread_start) * 1000
                 
-                self.logger.log("✅ Trading operations started successfully")
+                total_elapsed = (time.perf_counter() - start_time) * 1000
+                self.logger.log(f"✅ Trading operations started successfully")
+                self.logger.log(f"[PERFORMANCE] start_trading_when_ready: {total_elapsed:.2f}ms (thread_start: {thread_elapsed:.2f}ms)")
             else:
                 self.logger.log("⚠️ Trading already running")
                 

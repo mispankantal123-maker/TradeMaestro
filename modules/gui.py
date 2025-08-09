@@ -437,24 +437,38 @@ class TradingBotGUI:
     def _start_bot(self):
         """Start trading operations with current GUI settings"""
         try:
+            import time
+            import threading
+            start_time = time.perf_counter()
+            
             # Validate and apply all GUI settings before starting
+            param_start = time.perf_counter()
             lot = self.get_current_lot()
             tp = self.get_current_tp()
             sl = self.get_current_sl()
             strategy = self.widgets['strategy_combo'].get()
+            param_elapsed = (time.perf_counter() - param_start) * 1000
             
             self.logger.log(f"🚀 Starting trading with {strategy} strategy: Lot={lot}, TP={tp}, SL={sl}")
+            self.logger.log(f"[DEBUG] _start_bot running in thread: {threading.current_thread().name}")
             
             # Update GUI state
+            gui_start = time.perf_counter()
             self.widgets['start_btn'].config(state='disabled')
             self.widgets['stop_btn'].config(state='normal')
             self.widgets['trading_status'].config(text="🟢 Trading Active", foreground='green')
+            gui_elapsed = (time.perf_counter() - gui_start) * 1000
             
             # Start trading operations (non-blocking)
+            trading_start = time.perf_counter()
             if hasattr(self.bot, 'start_trading_when_ready'):
                 self.bot.start_trading_when_ready()
             else:
                 self.logger.log("⚠️ Trading method not available")
+            trading_elapsed = (time.perf_counter() - trading_start) * 1000
+            
+            total_elapsed = (time.perf_counter() - start_time) * 1000
+            self.logger.log(f"[PERFORMANCE] _start_bot complete: {total_elapsed:.2f}ms (params:{param_elapsed:.2f}ms, gui:{gui_elapsed:.2f}ms, trading:{trading_elapsed:.2f}ms)")
                 
         except Exception as e:
             self.logger.log(f"❌ Error starting trading: {str(e)}")
