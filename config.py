@@ -8,8 +8,8 @@ from typing import Dict, Any, List, Tuple
 
 # === SECURITY CONFIGURATION ===
 # Get sensitive data from environment variables for security
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "your_telegram_bot_token")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "your_chat_id")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8365734234:AAH2uTaZPDD47Lnm3y_Tcr6aj3xGL-bVsgk")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "5061106648")
 
 # === CONNECTION CONFIGURATION ===
 MAX_CONNECTION_ATTEMPTS = 5
