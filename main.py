@@ -322,6 +322,11 @@ class TradingBot:
             # Initialize strategy manager (COMPONENTS ONLY - NO TRADING LOOP)
             self.strategy_manager.initialize(self.connection.mt5, self.account_manager)
             
+            # Initialize TradeMaestro Core with rebuilt architecture
+            from modules.trade_maestro_core import TradeMaestroCore
+            self.core_engine = TradeMaestroCore(self.logger, self.connection.mt5)
+            self.logger.log("✅ TradeMaestro Core engine initialized")
+            
             elapsed = time.time() - step_start
             self.logger.log(f"[STARTUP] ✅ Strategy manager initialized in {elapsed:.3f}s")
             

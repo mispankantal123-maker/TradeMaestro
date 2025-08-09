@@ -1,0 +1,241 @@
+Rebuild Blueprint & Post‑Fix Audit — TradeMaestro
+
+Ringkasan singkat
+Dokumen ini berisi blueprint arsitektur ulang (rebuild) TradeMaestro yang mempertahankan logika strategi lama namun menguatkan aspek stabilitas agar menghilangkan crash/freeze. Juga disertakan post-fix audit checklist dan panduan pengujian untuk memastikan hasil rebuild aman diproduksi.
+
+1. Tujuan Rebuild
+
+Mempertahankan strategi dan konfigurasi yang ada.
+
+Memisahkan concerns: UI/control vs data processing vs eksekusi order.
+
+Menghilangkan pola pemblokiran (blocking) dan potensi deadlock.
+
+Menambahkan monitoring, timeout, cache, dan recovery otomatis.
+
+2. Arsitektur Tingkat Tinggi
+
+Main Controller (Main Thread): Event handling, kontrol lifecycle (start/stop), health checks.
+
+Data Fetcher (Worker): Mengambil candles / ticks dari MT5 secara berkala, menulis ke ring buffer.
+
+Processor (Worker Pool / Async Tasks): Menghitung indikator, sinyal trading, validasi sebelum order.
+
+Executor (Worker): Mengirim order ke MT5 via queue, menangani retry/timeouts.
+
+Monitor: Background task yang memonitor CPU/mem, thread count, MT5 health.
+
+State Store / Cache: In-memory bounded cache (deque) untuk candle terakhir (mis: max 1000).
+
+Komunikasi antar-komponen via thread-safe queues (queue.Queue) dan event flags (threading.Event).
+
+3. Pola Utama (Design Patterns)
+
+Producer-Consumer: Fetcher -> Processor -> Executor
+
+Circuit Breaker untuk API MT5 (jangan panggil terus-menerus jika server bermasalah)
+
+Bounded Queue untuk mencegah memory blow-up
+
+Watchdog Timer: restart worker jika tidak merespon dalam X detik
+
+Graceful Shutdown: event stop_event yang diawasi semua worker
+
+4. Template Kode — Kerangka Aman (Python)
+
+import threading
+import time
+from collections import deque
+from queue import Queue, Full, Empty
+
+# Config
+CANDLE_CACHE_SIZE = 1000
+FETCH_INTERVAL = 0.5  # detik
+PROCESS_TIMEOUT = 2.0
+EXECUTE_TIMEOUT = 5.0
+QUEUE_MAXSIZE = 200
+
+# Shared
+stop_event = threading.Event()
+candle_cache = deque(maxlen=CANDLE_CACHE_SIZE)
+fetch_queue = Queue(maxsize=QUEUE_MAXSIZE)
+exec_queue = Queue(maxsize=QUEUE_MAXSIZE)
+
+# Helper safe MT5 call (synchronous wrapper with timeout & retries)
+def safe_mt5_call(func, *args, retries=3, timeout=2.0, backoff=0.5):
+    for i in range(retries):
+        start = time.time()
+        try:
+            res = func(*args)
+        except Exception as e:
+            res = None
+        elapsed = time.time() - start
+        if res is not None:
+            return res
+        if elapsed > timeout:
+            # treat as failure, sleep exponential backoff
+            time.sleep(backoff * (i + 1))
+    return None
+
+# Fetcher
+def fetcher_loop(mt5_interface):
+    while not stop_event.is_set():
+        data = safe_mt5_call(mt5_interface.copy_rates_from_pos, ...)
+        if data:
+            candle_cache.extend(data)
+            try:
+                fetch_queue.put_nowait(data)
+            except Full:
+                # drop oldest or log
+                pass
+        # short sleep to avoid busy loop
+        time.sleep(FETCH_INTERVAL)
+
+# Processor worker
+def processor_loop():
+    while not stop_event.is_set():
+        try:
+            data = fetch_queue.get(timeout=1)
+        except Empty:
+            continue
+        # run indicator calculations with timeout/guards
+        # push signal to exec_queue
+        fetch_queue.task_done()
+
+# Executor
+def executor_loop(mt5_interface):
+    while not stop_event.is_set():
+        try:
+            order = exec_queue.get(timeout=1)
+        except Empty:
+            continue
+        res = safe_mt5_call(mt5_interface.order_send, order, retries=3, timeout=EXECUTE_TIMEOUT)
+        exec_queue.task_done()
+
+# Main controller to start threads
+def start_all(mt5_interface):
+    threads = []
+    t_fetch = threading.Thread(target=fetcher_loop, args=(mt5_interface,), daemon=True)
+    threads.append(t_fetch)
+    for _ in range(2):
+        t_proc = threading.Thread(target=processor_loop, daemon=True)
+        threads.append(t_proc)
+    t_exec = threading.Thread(target=executor_loop, args=(mt5_interface,), daemon=True)
+    threads.append(t_exec)
+
+    for t in threads:
+        t.start()
+
+    # monitor loop
+    try:
+        while not stop_event.is_set():
+            # health checks, monitoring
+            time.sleep(5)
+    except KeyboardInterrupt:
+        stop_event.set()
+    finally:
+        # wait gracefully with timeout
+        for t in threads:
+            t.join(timeout=2)
+
+Catatan: ganti ... dengan parameter MT5 yang sesuai. Semua panggilan MT5 harus dijaga lewat safe_mt5_call.
+
+5. Monitoring & Logging
+
+Logging: setiap fungsi kritis log start/end + duration.
+
+Health metrics: CPU, memory, threads, queue sizes — catat tiap 5s.
+
+If queue size > threshold → back-pressure / slow down fetcher.
+
+Watchdog: jika processor/executor tidak memproses item N detik → restart worker.
+
+6. Audit Checklist (Post-Rebuild)
+
+Gunakan checklist ini untuk verifikasi:
+
+Semua loop endless punya time.sleep atau blocking queue waits.
+
+Semua panggilan MT5 melewati safe_mt5_call (timeout/retry).
+
+Tidak ada threading.Lock() yang bisa deadlock; jika ada gunakan with lock dan timeout.
+
+Semua queue bounded (maxsize) dan ada policy saat penuh.
+
+Semua struktur data besar punya batas (deque maxlen).
+
+Ada stop_event global, setiap worker cek stop_event.is_set().
+
+Monitoring aktif dan logs cukup untuk repro issue.
+
+Unit tests: fungsi safe call, queue backpressure, graceful shutdown.
+
+7. Rencana Pengujian (Testing Plan)
+
+Unit tests: safe_mt5_call, queue behavior, cache.
+
+Integration tests: mock MT5 (latency + failures) — pastikan retries & circuit breaker bekerja.
+
+Stress test: kirim tick rate tinggi (10–1000 ticks/s) selama 30 menit.
+
+Chaos test: putus koneksi MT5 sesaat, restart server MT5.
+
+Memory leak test: jalankan 24 jam, monitor memory.
+
+Simulasi live: paper trading saat market real.
+
+8. Tabel Prioritas Perbaikan (Contoh)
+
+Prioritas
+
+Area
+
+Tindakan
+
+P0
+
+MT5 API
+
+Bungkus semua panggilan pakai safe_mt5_call + circuit breaker
+
+P0
+
+Main loop
+
+Pisahkan fetch/processor/executor ke worker
+
+P1
+
+Queue
+
+Gunakan bounded queue & monitoring
+
+P1
+
+Memory
+
+Batasi cache & clear large data setelah use
+
+P2
+
+Logging
+
+Tambah timings & resource logs
+
+9. Artefak yang Aku Siapkan Kalau Kamu Mau Lanjut
+
+Kerangka kode yang bisa aku injeksikan ke repo (file trade_maestro_core.py).
+
+Skrip profiling kecil untuk menemukan fungsi yang paling lama (profiler_helper.py).
+
+Panduan migrasi langkah demi langkah.
+
+10. Langkah Selanjutnya yang Direkomendasikan
+
+Aku implementasikan kerangka (starter files) dan push patch ke cabang rebuild/trademaestro (atau saya kirim patch file).
+
+Jalankan unit + integration tests dengan MT5 mock.
+
+Lakukan stress & chaos testing.
+
+Terapkan monitoring & observability di production (simple dashboard atau logs + alert).
