@@ -1,0 +1,149 @@
+Langkah Audit (harus dieksekusi secara berurutan)
+A. Inventory & Static Scan (scan seluruh file git)
+Jalankan: git ls-files > /tmp/files.txt
+
+Cari pola berisiko di seluruh repo (jalankan rg / grep):
+
+nginx
+Copy
+Edit
+rg "while True|time.sleep\(|threading.Thread|ThreadPoolExecutor|QThread|multiprocessing|os.system\(|subprocess\.run\(|join\(|socket\.recv|asyncio\.run|await |faulthandler|copy_rates_from_pos|symbol_info_tick|symbol_info\(|MetaTrader5|mt5\." -n
+Hasil yang harus dikumpulkan: file, baris, snippet untuk setiap match.
+
+Jalankan linter & pelajari peringatan kritis (race conditions, blocking calls in init).
+
+B. Cari titik entry & alur startup
+Temukan file entry (git grep "if __name__ == '__main__' -n" atau cek setup.py, main.py, app.py, gui.py).
+
+Identifikasi fungsi yang dieksekusi setelah log: cari string [POST-STARTUP] Launching trading strategies... atau log serupa.
+
+Catat urutan panggilan (call chain) dari entry → startup → post-startup function.
+
+C. Fokus ke panggilan MT5 & blocking C-extensions
+Cari semua pemanggilan MT5 (module MetaTrader5 atau mt5.). Untuk tiap panggilan, catat apakah:
+
+Dipanggil di main thread atau worker thread.
+
+Ada timeout atau penanganan exception.
+
+Periksa apakah fungsi yang memanggil MT5 bisa block (C-extension). Tandai panggilan tanpa wrapper safe_mt5_call atau ThreadPoolExecutor.
+
+D. Threading & GUI rules
+Verifikasi:
+
+Semua operasi berat (koneksi, fetch historical, warmup indicators, strategy loops, tick listeners) berjalan di thread terpisah.
+
+GUI updates dipanggil hanya dari main thread (tkinter→after, PyQt→signals).
+
+Lakukan rg untuk after(, invoke, QTimer, emit(, signal, queue.Queue.
+
+Jika ada loop seperti while True: di file yang diimport oleh GUI, tandai segera.
+
+E. Dynamic Reproduction & Logging
+Instruksikan menjalankan aplikasi dengan debug logging: python main.py atau perintah run repo.
+
+Capture stdout/stderr ke file: python main.py > run_log.txt 2>&1.
+
+Saat freeze terjadi, ambil:
+
+run_log.txt
+
+timestamp terakhir log
+
+screenshot GUI
+
+Jika freeze terjadi, ambil thread dump / stack traces:
+
+Jika Linux/macOS: gunakan py-spy dump --pid <pid> atau gdb/faulthandler.
+
+Jika Windows: gunakan py-spy dump --pid <pid> atau tambahkan di kode:
+
+python
+Copy
+Edit
+import faulthandler, sys
+faulthandler.dump_traceback(sys.stderr)
+Sertakan hasil dump (stack traces semua thread) di laporan.
+
+F. Profiling Post-Startup
+Profil fungsi yang dipanggil setelah [POST-STARTUP] Launching trading strategies...:
+
+Gunakan cProfile untuk merekam 10s–60s setelah log muncul:
+
+bash
+Copy
+Edit
+python -m cProfile -o profile.poststartup.prof main.py
+Alternatif sampling profiler: py-spy record -o flame.svg -- python main.py lalu buka flame.svg.
+
+Identifikasi fungsi/top caller yang memakan CPU waktu terlama atau yang tidak kembali ke event loop.
+
+G. Stress & Edge Cases
+Uji kondisi:
+
+MT5 disconnected (mock): apakah aplikasi tetap responsif?
+
+Broker dengan 400 simbol: apakah GUI mencoba memuat semua simbol langsung?
+
+Simulasi banyak tick / high-frequency: apakah GUI masih responsif?
+
+Jalankan test automated: pytest tests/test_startup.py (jika ada), atau buat test kecil untuk mensimulasikan start & post-start behavior.
+
+H. Security & Safety checks
+Pastikan tidak ada kredensial plain-text.
+
+Pastikan emergency-stop logic tidak bisa terblokir.
+
+Pastikan logging tidak memuat API keys.
+
+Output Audit yang WAJIB diberikan
+Executive summary singkat (1 paragraf): penyebab freeze & risiko utama.
+
+Full list of findings:
+
+File & line number (format path:lineno) untuk setiap blocking call / loop / anti-pattern.
+
+Untuk setiap item: why it’s a problem, severity (Critical/High/Medium/Low).
+
+Reproduction artifacts:
+
+run_log.txt, thread dumps, profiler output (flamegraph/profile file), screenshot.
+
+Concrete Fix Plan (PR-ready):
+
+Untuk tiap issue: patch suggestion (kode snippet) dan file yang perlu diubah.
+
+Prioritas urut: must-fix (blocking), should-fix, optional.
+
+Quick patch (opsional tapi sangat diharapkan): minimal change yang langsung membuat GUI responsif (mis: memindahkan launch_strategies() ke worker thread + safe queue).
+
+Acceptance tests: langkah verifikasi setelah patch diterapkan (explicit commands).
+
+Estimate waktu implementasi untuk setiap perbaikan (hours).
+
+Checklist teknis yang harus dipastikan di patch
+ Tidak ada while True / loop blocking di main thread tanpa yield/sleep/after.
+
+ Semua MT5 calls di worker threads atau menggunakan non-blocking wrapper dengan timeout.
+
+ GUI updates hanya melalui after() (tkinter) atau signal-slot (PyQt).
+
+ Bulk symbol/data load dilakukan batching & lazy-loading.
+
+ Strategy loops dan tick consumption berjalan pada worker thread dan push update via queue.Queue/signal.
+
+ Timeout policy & retry logic untuk MT5 initialization/fetch.
+
+ Worker exceptions tidak crash aplikasi; dilogging saja dan ditandai di UI.
+
+ Add health endpoint / command untuk memeriksa “is GUI alive” (opsional).
+
+Instruksi tambahan untuk reviewer/AI
+Jalankan rg/grep di seluruh repo — jangan hanya di folder modules/.
+
+Jika menemukan 3rd-party library wrapper yang melakukan blocking, catat dan sarankan cara isolasi (process pool, timeouts).
+
+Jika tidak menemukan blok jelas, gunakan profiler sampling (py-spy) — laporkan top 10 functions.
+
+Buat PR minimal yang membuat GUI responsif; beri commit message singkat & test steps.
+
