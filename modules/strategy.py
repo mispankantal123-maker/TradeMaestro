@@ -12,6 +12,9 @@ from config import *
 from .indicators import IndicatorCalculator
 from .orders import OrderManager
 from .news_filter import NewsFilter
+from .ai_analysis import AIMarketAnalyzer
+from .tp_sl_parser import TPSLParser
+from .complete_strategy import CompleteStrategyEngine
 
 
 class StrategyManager:
@@ -27,6 +30,9 @@ class StrategyManager:
         self.order_manager = None
         self.indicator_calculator = None
         self.news_filter = None
+        self.ai_analyzer = None
+        self.tp_sl_parser = None
+        self.gui = None  # GUI reference for parameter retrieval
         
         self.current_strategy = "Scalping"
         self.strategy_lock = threading.Lock()
@@ -56,8 +62,11 @@ class StrategyManager:
                                             self.risk_manager, account_manager)
             self.indicator_calculator = IndicatorCalculator(self.logger, mt5_instance)
             self.news_filter = NewsFilter(self.logger)
+            self.ai_analyzer = AIMarketAnalyzer(self.logger)
+            self.tp_sl_parser = TPSLParser(self.logger, self.symbol_manager, account_manager)
+            self.strategy_engine = CompleteStrategyEngine(self.logger, self.ai_analyzer)
             
-            self.logger.log("✅ Strategy Manager initialized")
+            self.logger.log("✅ Strategy Manager initialized with AI enhancement")
             
         except Exception as e:
             self.logger.log(f"❌ Strategy Manager initialization failed: {str(e)}")
@@ -157,34 +166,57 @@ class StrategyManager:
             # Calculate all indicators needed for strategies
             data = self.indicator_calculator.calculate_all_indicators(data)
             
-            # Run the complete strategy analysis from bobot2.py
-            action, signals = self._run_complete_strategy(self.current_strategy, data, symbol)
+            # Run the complete strategy analysis with AI enhancement
+            action, signals = self.strategy_engine.run_complete_strategy(self.current_strategy, data, symbol)
             
             if action and action in ['BUY', 'SELL']:
-                # Calculate TP/SL based on strategy
-                tp_pips = STRATEGY_DEFAULTS[self.current_strategy]['tp_pips']
-                sl_pips = STRATEGY_DEFAULTS[self.current_strategy]['sl_pips']
-                lot_size = STRATEGY_DEFAULTS[self.current_strategy]['lot_size']
-                
-                # Get current price for TP/SL calculation
+                # Get parameters from GUI (NOT hardcoded from config!)
                 current_price = data['close'].iloc[-1]
                 
-                # Calculate TP/SL prices
-                if action == 'BUY':
-                    tp_price = current_price + (tp_pips * 0.0001)  # Assuming 4-digit precision
-                    sl_price = current_price - (sl_pips * 0.0001)
+                if self.gui:
+                    # Get GUI parameters (exact bobot2.py integration)
+                    lot_size = self.gui.get_current_lot()
+                    tp_value = self.gui.get_current_tp()
+                    sl_value = self.gui.get_current_sl()
+                    tp_unit = self.gui.get_current_tp_unit()
+                    sl_unit = self.gui.get_current_sl_unit()
                 else:
-                    tp_price = current_price - (tp_pips * 0.0001)
-                    sl_price = current_price + (sl_pips * 0.0001)
+                    # Fallback if no GUI (headless mode)
+                    lot_size = STRATEGY_DEFAULTS[self.current_strategy]['lot_size']
+                    tp_value = str(STRATEGY_DEFAULTS[self.current_strategy]['tp_pips'])
+                    sl_value = str(STRATEGY_DEFAULTS[self.current_strategy]['sl_pips'])
+                    tp_unit = "pips"
+                    sl_unit = "pips"
                 
-                # Execute trade
+                # Parse TP/SL using multi-unit parser (exact bobot2.py functionality)
+                tp_price = None
+                sl_price = None
+                
+                if tp_value and tp_value.strip():
+                    tp_price = self.tp_sl_parser.parse_tp_sl_input(
+                        tp_value, tp_unit, symbol, current_price, action)
+                
+                if sl_value and sl_value.strip():
+                    sl_price = self.tp_sl_parser.parse_tp_sl_input(
+                        sl_value, sl_unit, symbol, current_price, 
+                        "SELL" if action == "BUY" else "BUY")  # Opposite for SL
+                
+                # Validate TP/SL levels
+                is_valid, error_msg = self.tp_sl_parser.validate_tp_sl_levels(
+                    symbol, current_price, tp_price, sl_price, action)
+                
+                if not is_valid:
+                    self.logger.log(f"❌ Invalid TP/SL levels for {symbol}: {error_msg}")
+                    return
+                
+                # Execute trade with enhanced parameters
                 result = self.order_manager.place_order(
                     symbol=symbol,
                     action=action,
                     volume=lot_size,
                     tp_price=tp_price,
                     sl_price=sl_price,
-                    comment=f"{self.current_strategy}_Signal"
+                    comment=f"{self.current_strategy}_AI_Signal"
                 )
                 
                 if result:
@@ -197,6 +229,11 @@ class StrategyManager:
         
         except Exception as e:
             self.logger.log(f"❌ Error analyzing symbol {symbol}: {str(e)}")
+    
+    def set_gui_reference(self, gui_instance):
+        """Set GUI reference for parameter retrieval (exact bobot2.py integration)."""
+        self.gui = gui_instance
+        self.logger.log("✅ GUI reference set for strategy manager")
     
     def _get_market_data(self, symbol: str) -> Optional[Dict[str, Any]]:
         """

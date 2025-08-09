@@ -29,6 +29,14 @@ BOT_LOOP_INTERVALS = {
     "Arbitrage": 2.0
 }
 
+# Strategy intervals for signal timing
+STRATEGY_INTERVALS = {
+    "HFT": 30,      # 30 seconds between signals
+    "Scalping": 60,  # 1 minute between signals
+    "Intraday": 120, # 2 minutes between signals
+    "Arbitrage": 90  # 1.5 minutes between signals
+}
+
 # Default trading parameters
 DEFAULT_RISK_PERCENT = 1.0
 DEFAULT_MAX_POSITIONS = 10

@@ -282,6 +282,95 @@ class IndicatorCalculator:
             self.logger.log(f"❌ Error calculating Momentum: {str(e)}")
             return pd.Series()
     
+    def calculate_wma(self, data: pd.Series, period: int) -> pd.Series:
+        """
+        Calculate Weighted Moving Average.
+        
+        Args:
+            data: Price data series
+            period: WMA period
+            
+        Returns:
+            WMA series
+        """
+        try:
+            weights = np.arange(1, period + 1)
+            return data.rolling(period).apply(
+                lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating WMA: {str(e)}")
+            return pd.Series()
+    
+    def calculate_enhanced_rsi(self, data: pd.Series, period: int = 14) -> Dict[str, pd.Series]:
+        """
+        Calculate enhanced RSI with multiple periods from bobot2.py.
+        
+        Args:
+            data: Price data series
+            period: Base RSI period
+            
+        Returns:
+            Dict with RSI variants
+        """
+        try:
+            result = {}
+            
+            # Calculate RSI for different periods (like bobot2.py)
+            for p in [7, 9, 14]:
+                delta = data.diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=p).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=p).mean()
+                
+                rs = gain / loss
+                rsi = 100 - (100 / (1 + rs))
+                result[f'RSI{p}'] = rsi.fillna(50)
+            
+            # Default RSI (RSI9 for scalping like bobot2.py)
+            result['RSI'] = result['RSI9']
+            
+            # RSI Smooth (3-period average)
+            result['RSI_Smooth'] = result['RSI'].rolling(window=3).mean()
+            
+            return result
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating enhanced RSI: {str(e)}")
+            return {'RSI': pd.Series()}
+    
+    def calculate_volume_analysis(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
+        """
+        Calculate volume-based indicators from bobot2.py.
+        
+        Args:
+            data: OHLCV DataFrame
+            
+        Returns:
+            Dict with volume indicators
+        """
+        try:
+            result = {}
+            
+            if 'volume' not in data.columns:
+                # Create synthetic volume for non-volume data
+                result['volume'] = pd.Series(1, index=data.index)
+            else:
+                result['volume'] = data['volume']
+            
+            # Volume moving average
+            result['volume_ma'] = result['volume'].rolling(20).mean()
+            
+            # Volume ratio
+            result['volume_ratio'] = result['volume'] / result['volume_ma']
+            
+            # Volume surge detection
+            result['volume_surge'] = result['volume_ratio'] > 1.5
+            
+            return result
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating volume analysis: {str(e)}")
+            return {}
+    
     def calculate_all_indicators(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate all indicators and add them to the DataFrame (bobot2.py compatible).
