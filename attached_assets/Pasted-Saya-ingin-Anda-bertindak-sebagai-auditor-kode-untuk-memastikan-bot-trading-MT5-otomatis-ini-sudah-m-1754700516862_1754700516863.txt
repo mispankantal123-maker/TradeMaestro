@@ -1,0 +1,34 @@
+Saya ingin Anda bertindak sebagai auditor kode untuk memastikan bot trading MT5 otomatis ini sudah memenuhi semua persyaratan berikut, karena ini akan digunakan untuk LIVE TRADING.
+
+## Tugas Anda
+1. Analisa seluruh kode bot yang telah dibuat.
+2. Gunakan checklist di bawah untuk memeriksa setiap requirement.
+3. Untuk setiap poin, beri status:
+   - ✅ (OK) = sudah sesuai dan berfungsi.
+   - ⚠️ (Perlu Perbaikan) = ada tapi belum sempurna.
+   - ❌ (Belum Ada) = tidak ditemukan atau tidak berfungsi.
+4. Tambahkan catatan singkat untuk menjelaskan temuan dan rekomendasi perbaikan.
+
+## Checklist Requirement
+| No | Poin Requirement | Status | Catatan / Saran Perbaikan |
+|----|------------------|--------|---------------------------|
+| 1  | Arsitektur modular, fungsi utama di modul terpisah |    |   |
+| 2  | MT5 connection: multi-attempt, auto-reconnect, diagnosa lengkap |    |   |
+| 3  | Symbol management: validasi & aktivasi simbol otomatis, deteksi gold, saran simbol |    |   |
+| 4  | Account management: info akun, posisi, currency conversion |    |   |
+| 5  | Risk management: pip value calculation, auto-lot sizing (% risk & SL pips), validasi TP/SL |    |   |
+| 6  | Strategi trading: HFT, Scalping, Intraday, Arbitrage |    |   |
+| 7  | Session-aware adjustment: lot, TP, SL, preferred pairs per sesi |    |   |
+| 8  | Order execution: open/close/modify order dengan validasi kondisi trading |    |   |
+| 9  | High-impact news filter |    |   |
+| 10 | Logging: console, GUI, file, integrasi Telegram |    |   |
+| 11 | GUI: start/stop bot, emergency stop, kalkulator TP/SL, monitoring posisi, export logs |    |   |
+| 12 | Cleanup & memory management |    |   |
+| 13 | Error handling penuh di semua fungsi kritis |    |   |
+| 14 | PEP8 compliant, Python 3.10+, type hints, semua fungsi ada docstring |    |   |
+| 15 | Siap digunakan live trading tanpa bug kritis |    |   |
+
+## Output yang Diharapkan
+- Lengkapi tabel checklist di atas.
+- Jika ada status ⚠️ atau ❌, jelaskan secara detail file/fungsi yang bermasalah dan berikan solusi teknis.
+- Berikan rekomendasi pengujian tambahan sebelum digunakan di live trading.
