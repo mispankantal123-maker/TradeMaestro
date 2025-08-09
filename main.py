@@ -22,6 +22,7 @@ from modules.utils import cleanup_resources
 from modules.sessions import SessionManager
 from modules.strategy import StrategyManager
 from modules.account import AccountManager
+from windows_freeze_fix import WindowsFreezeFix
 
 
 class TradingBot:
@@ -38,6 +39,10 @@ class TradingBot:
         
         self.running = False
         self.main_thread: Optional[threading.Thread] = None
+        
+        # Setup Windows freeze prevention
+        self.freeze_fix = WindowsFreezeFix(self.logger)
+        self.freeze_fix.setup_windows_compatibility()
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -89,6 +94,14 @@ class TradingBot:
         try:
             self.logger.log("🛑 Stopping Trading Bot...")
             self.running = False
+            
+            # Stop TradeMaestro Core if running
+            if hasattr(self, 'core_engine'):
+                self.core_engine.stop()
+            
+            # Stop Windows freeze prevention
+            if hasattr(self, 'freeze_fix'):
+                self.freeze_fix.stop_watchdog()
             
             # Wait for main thread to finish
             if self.main_thread and self.main_thread.is_alive():
@@ -334,6 +347,10 @@ class TradingBot:
             self.logger.log(f"[STARTUP] ✅ All components initialized in {total_elapsed:.3f}s")
             self.logger.log(f"[STARTUP] 📌 Trading loop NOT started - GUI will remain responsive")
             
+            # CRITICAL WINDOWS FIX: DO NOT START TRADING LOOP AUTOMATICALLY
+            # This prevents the Windows freeze issue by keeping the main thread free
+            self.logger.log(f"[WINDOWS-FIX] Trading must be started manually via START button")
+            
             return True
             
         except Exception as e:
@@ -350,15 +367,24 @@ class TradingBot:
                 self.logger.log(f"[TRADING] 🚀 Starting trading operations...")
                 self.running = True
                 
-                # Start main trading loop in separate thread
-                thread_start = time.perf_counter()
-                self.main_thread = threading.Thread(target=self._main_loop, daemon=True)
-                self.main_thread.start()
-                thread_elapsed = (time.perf_counter() - thread_start) * 1000
+                # CRITICAL WINDOWS FIX: Use TradeMaestro Core instead of main loop
+                if hasattr(self, 'core_engine'):
+                    success = self.core_engine.start()
+                    if success:
+                        self.logger.log(f"[TRADING] ✅ TradeMaestro Core started successfully")
+                    else:
+                        self.logger.log(f"[TRADING] ❌ Failed to start TradeMaestro Core")
+                else:
+                    # Fallback to original method if core engine not available
+                    thread_start = time.perf_counter()
+                    self.main_thread = threading.Thread(target=self._main_loop, daemon=True)
+                    self.main_thread.start()
+                    thread_elapsed = (time.perf_counter() - thread_start) * 1000
+                    self.logger.log(f"[TRADING] ✅ Trading thread started successfully")
                 
                 total_elapsed = (time.perf_counter() - start_time) * 1000
                 self.logger.log(f"✅ Trading operations started successfully")
-                self.logger.log(f"[PERFORMANCE] start_trading_when_ready: {total_elapsed:.2f}ms (thread_start: {thread_elapsed:.2f}ms)")
+                self.logger.log(f"[PERFORMANCE] start_trading_when_ready: {total_elapsed:.2f}ms")
             else:
                 self.logger.log("⚠️ Trading already running")
                 
