@@ -9,7 +9,7 @@ import os
 import threading
 import time
 import signal
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # Add the project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -106,26 +106,45 @@ class TradingBot:
             self.logger.log(f"❌ Error stopping bot: {str(e)}")
     
     def _main_loop(self) -> None:
-        """Main trading loop that runs continuously."""
+        """Main trading loop that runs continuously with profiling."""
         try:
+            self.logger.log(f"[POST-STARTUP] Launching trading strategies...")
+            loop_start = time.time()
+            
             while self.running:
                 try:
-                    # Check MT5 connection health
+                    cycle_start = time.time()
+                    
+                    # Step 1: Check MT5 connection health (with timeout)
+                    conn_start = time.time()
                     if not self.connection.check_connection():
                         self.logger.log("⚠️ MT5 connection lost, attempting to reconnect...")
                         if not self.connection.connect():
                             self.logger.log("❌ Failed to reconnect to MT5")
                             time.sleep(CONNECTION_RETRY_DELAY)
                             continue
+                    conn_elapsed = time.time() - conn_start
                     
-                    # Get current session
+                    # Step 2: Get current session (lightweight)
+                    session_start = time.time()
                     current_session = self.session_manager.get_current_session()
+                    session_elapsed = time.time() - session_start
                     
-                    # Execute trading strategy
-                    self.strategy_manager.execute_strategy(current_session)
+                    # Step 3: Execute trading strategy (MOVED TO THREAD POOL)
+                    strategy_start = time.time()
+                    self._execute_strategy_async(current_session)
+                    strategy_elapsed = time.time() - strategy_start
                     
-                    # Update session data
+                    # Step 4: Update session data (lightweight)
+                    update_start = time.time()
                     self.session_manager.update_session_data()
+                    update_elapsed = time.time() - update_start
+                    
+                    cycle_elapsed = time.time() - cycle_start
+                    
+                    # Log performance metrics (every 10 cycles to avoid spam)
+                    if int(time.time()) % 10 == 0:
+                        self.logger.log(f"[PERFORMANCE] Cycle: {cycle_elapsed:.3f}s (conn:{conn_elapsed:.3f}s, session:{session_elapsed:.3f}s, strategy:{strategy_elapsed:.3f}s, update:{update_elapsed:.3f}s)")
                     
                     # Sleep based on current strategy interval
                     strategy_name = self.strategy_manager.get_current_strategy()
@@ -138,6 +157,34 @@ class TradingBot:
                     
         except Exception as e:
             self.logger.log(f"❌ Fatal error in main loop: {str(e)}")
+    
+    def _execute_strategy_async(self, current_session: Dict[str, Any]) -> None:
+        """Execute strategy in thread pool to prevent GUI blocking."""
+        try:
+            # Use thread pool for strategy execution
+            import concurrent.futures
+            
+            if not hasattr(self, '_strategy_executor'):
+                self._strategy_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="Strategy")
+            
+            # Submit strategy execution to thread pool (non-blocking)
+            future = self._strategy_executor.submit(self.strategy_manager.execute_strategy, current_session)
+            
+            # Add callback for completion (optional logging)
+            def strategy_completed(future):
+                try:
+                    future.result(timeout=1.0)  # Get result with timeout
+                except concurrent.futures.TimeoutError:
+                    self.logger.log("⚠️ Strategy execution timeout")
+                except Exception as e:
+                    self.logger.log(f"❌ Strategy execution error: {str(e)}")
+            
+            future.add_done_callback(strategy_completed)
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error in async strategy execution: {str(e)}")
+            # Fallback to synchronous execution
+            self.strategy_manager.execute_strategy(current_session)
     
     def start_gui(self) -> None:
         """Start the GUI interface with non-blocking startup."""

@@ -73,28 +73,89 @@ class StrategyManager:
     
     def execute_strategy(self, current_session: Dict[str, Any]) -> None:
         """
-        Execute the current trading strategy.
+        Execute the current trading strategy with batch processing and profiling.
         
         Args:
             current_session: Current trading session information
         """
         try:
+            exec_start = time.time()
+            self.logger.log(f"[STRATEGY] Executing {self.current_strategy} strategy...")
+            
             with self.strategy_lock:
                 if not self._should_trade(current_session):
                     return
                 
-                # Get preferred symbols for current session
+                # Get preferred symbols for current session (BATCHED processing)
                 preferred_symbols = current_session.get('preferred_pairs', POPULAR_SYMBOLS[:5])
                 
-                for symbol in preferred_symbols:
-                    try:
-                        self._analyze_and_trade_symbol(symbol, current_session)
-                    except Exception as e:
-                        self.logger.log(f"❌ Error analyzing {symbol}: {str(e)}")
-                        continue
+                # Batch processing: Process symbols in smaller batches to prevent blocking
+                batch_size = 2  # Process 2 symbols per batch
+                total_symbols = len(preferred_symbols)
+                
+                for i in range(0, total_symbols, batch_size):
+                    batch_start = time.time()
+                    batch = preferred_symbols[i:i + batch_size]
+                    
+                    self.logger.log(f"[STRATEGY] Processing batch {i//batch_size + 1}/{(total_symbols + batch_size - 1)//batch_size}: {batch}")
+                    
+                    for symbol in batch:
+                        try:
+                            symbol_start = time.time()
+                            self._analyze_and_trade_symbol_with_timeout(symbol, current_session)
+                            symbol_elapsed = time.time() - symbol_start
+                            
+                            # Log slow symbol analysis
+                            if symbol_elapsed > 2.0:
+                                self.logger.log(f"⚠️ Slow analysis for {symbol}: {symbol_elapsed:.3f}s")
+                                
+                        except Exception as e:
+                            self.logger.log(f"❌ Error analyzing {symbol}: {str(e)}")
+                            continue
+                    
+                    batch_elapsed = time.time() - batch_start
+                    self.logger.log(f"[STRATEGY] Batch completed in {batch_elapsed:.3f}s")
+                    
+                    # Yield control between batches (prevent blocking)
+                    time.sleep(0.1)
+                
+                total_elapsed = time.time() - exec_start
+                self.logger.log(f"[STRATEGY] ✅ Strategy execution completed in {total_elapsed:.3f}s")
                         
         except Exception as e:
             self.logger.log(f"❌ Error executing strategy: {str(e)}")
+    
+    def _analyze_and_trade_symbol_with_timeout(self, symbol: str, current_session: Dict[str, Any], timeout: int = 5) -> None:
+        """
+        Analyze symbol with timeout to prevent hanging.
+        
+        Args:
+            symbol: Trading symbol to analyze
+            current_session: Current session information
+            timeout: Maximum execution time in seconds
+        """
+        try:
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError(f"Symbol analysis timeout for {symbol}")
+            
+            # Set timeout alarm (Unix-only, fallback for other systems)
+            try:
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(timeout)
+                
+                # Execute the analysis
+                self._analyze_and_trade_symbol(symbol, current_session)
+                
+            finally:
+                signal.alarm(0)  # Cancel the alarm
+                
+        except TimeoutError as e:
+            self.logger.log(f"⚠️ {str(e)}")
+        except Exception as e:
+            # Fallback for systems without signal support
+            self._analyze_and_trade_symbol(symbol, current_session)
     
     def _should_trade(self, current_session: Dict[str, Any]) -> bool:
         """

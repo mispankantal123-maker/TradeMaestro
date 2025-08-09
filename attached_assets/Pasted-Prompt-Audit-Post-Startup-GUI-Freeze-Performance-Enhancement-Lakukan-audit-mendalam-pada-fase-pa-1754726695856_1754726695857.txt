@@ -1,0 +1,82 @@
+Prompt Audit – Post-Startup GUI Freeze & Performance Enhancement
+Lakukan audit mendalam pada fase pasca-startup MT5 trading bot untuk mengidentifikasi dan memperbaiki penyebab GUI freeze setelah proses inisialisasi selesai.
+Fokus pada alur eksekusi setelah log "Session changed to: <...>".
+
+Hal yang wajib diperiksa:
+
+1. Thread Management
+Pastikan listener harga / tick tidak dijalankan di main thread GUI.
+
+Review semua fungsi yang berjalan otomatis setelah startup:
+
+Loop strategi (while True)
+
+Event listener MT5
+
+Update tabel posisi / statistik
+
+Jika ada loop tanpa jeda atau tanpa after()/QTimer, tandai sebagai blocking.
+
+2. Symbol Loading
+Audit proses pemuatan data simbol (400 simbol tersedia).
+
+Jika semua simbol dimuat sekaligus, pecah jadi batch (misalnya 20 simbol per batch).
+
+Gunakan lazy loading untuk tabel aktif, hanya load data saat dibutuhkan.
+
+3. UI Update Pattern
+Pastikan update komponen GUI menggunakan mekanisme event loop (after() di tkinter / QTimer di PyQt).
+
+Jangan update tabel / chart langsung dalam loop berat di main thread.
+
+Audit apakah refresh rate UI terlalu tinggi (>10 fps bisa membebani CPU).
+
+4. Background Execution
+Pindahkan:
+
+Strategy execution
+
+Tick subscription
+
+Indicator calculation
+ke thread terpisah atau ThreadPoolExecutor.
+
+Gunakan queue atau signal-slot untuk mengirim data ke GUI secara aman.
+
+5. Error & Timeout Handling
+Pastikan setiap request MT5 dalam loop memiliki timeout.
+
+Tangani exception di worker thread agar tidak mematikan loop event GUI.
+
+6. Profiling Pasca-Startup
+Tambahkan log timestamp di setiap step setelah startup:
+
+"Launching strategies"
+
+"Subscribing to symbols"
+
+"Loading initial positions"
+
+"First GUI update"
+
+Jalankan profiling CPU untuk melihat fungsi mana yang mengunci eksekusi.
+
+7. Output Audit
+Daftar semua fungsi pasca-startup yang blocking.
+
+Rekomendasi thread-safe refactor untuk setiap fungsi.
+
+Usulan optimisasi load data & refresh UI.
+
+Estimasi waktu GUI menjadi responsif kembali setelah perubahan.
+
+Target akhir audit:
+
+Semua proses pasca-startup berjalan di background thread.
+
+GUI responsif < 0.5 detik setelah startup selesai.
+
+Load simbol & data bertahap, bukan sekaligus.
+
+Update UI hanya dilakukan di main thread via event loop, tidak blocking.
+

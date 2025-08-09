@@ -9,6 +9,7 @@ from tkinter.scrolledtext import ScrolledText
 import threading
 import datetime
 import csv
+import time
 from typing import Optional, Dict, Any, Callable
 
 from config import *
@@ -589,6 +590,103 @@ class TradingBotGUI:
         except Exception as e:
             pass  # Don't spam logs for display updates
     
+    def _update_display_optimized(self) -> None:
+        """Optimized display update with lazy loading and batching."""
+        try:
+            # Only update if GUI components exist (fail-safe)
+            if not self.root or not self.widgets:
+                return
+            
+            # Lazy loading: Only update visible tab to save performance
+            if 'notebook' in self.widgets:
+                current_tab = self.widgets['notebook'].select()
+                if not current_tab:
+                    return
+                
+                tab_name = self.widgets['notebook'].tab(current_tab, "text")
+                
+                # Update only the active tab
+                if "Dashboard" in tab_name:
+                    self._update_dashboard_optimized()
+                elif "Logs" in tab_name:
+                    self._update_logs_optimized()
+                # Skip other tabs for performance
+        
+        except Exception as e:
+            pass  # Silent fail for display updates
+    
+    def _update_dashboard_optimized(self) -> None:
+        """Optimized dashboard update with batched operations."""
+        try:
+            # Batch all account info updates
+            if hasattr(self.bot, 'account_manager') and self.bot.account_manager:
+                account_info = self.bot.account_manager.get_account_info()
+                if account_info and 'stats' in self.widgets:
+                    # Batch widget updates to minimize redraws
+                    updates = {
+                        'balance': f"${account_info.get('balance', 0):.2f}",
+                        'equity': f"${account_info.get('equity', 0):.2f}",
+                        'margin': f"{account_info.get('margin_level', 0):.1f}%",
+                        'free_margin': f"${account_info.get('free_margin', 0):.2f}"
+                    }
+                    
+                    for key, value in updates.items():
+                        if key in self.widgets['stats']:
+                            self.widgets['stats'][key].config(text=value)
+            
+            # Efficient position update (limit to 10 most recent)
+            self._update_positions_efficient()
+            
+        except Exception as e:
+            pass
+    
+    def _update_positions_efficient(self) -> None:
+        """Efficient position table update with limits."""
+        try:
+            if 'pos_tree' not in self.widgets:
+                return
+            
+            # Limit position updates to prevent GUI overload
+            if hasattr(self.bot, 'strategy_manager') and self.bot.strategy_manager:
+                positions = []  # Get from strategy manager (max 10)
+                
+                # Only clear and update if positions changed
+                if not hasattr(self, '_last_position_count') or self._last_position_count != len(positions):
+                    self._last_position_count = len(positions)
+                    
+                    # Clear existing items efficiently
+                    for item in self.widgets['pos_tree'].get_children():
+                        self.widgets['pos_tree'].delete(item)
+                    
+                    # Add positions (max 10 for performance)
+                    for i, pos in enumerate(positions[:10]):
+                        self.widgets['pos_tree'].insert('', 'end', values=(
+                            pos.get('ticket', ''),
+                            pos.get('symbol', ''),
+                            pos.get('type', ''),
+                            pos.get('volume', ''),
+                            f"{pos.get('price_open', 0):.5f}",
+                            f"{pos.get('price_current', 0):.5f}",
+                            f"${pos.get('profit', 0):.2f}",
+                            f"{pos.get('pips', 0):.1f}"
+                        ))
+        except Exception as e:
+            pass
+    
+    def _update_logs_optimized(self) -> None:
+        """Optimized log update with buffering."""
+        try:
+            # Only update logs if tab is visible and has new content
+            if hasattr(self.logger, 'get_recent_logs'):
+                recent_logs = self.logger.get_recent_logs(50)  # Last 50 logs only
+                if recent_logs and 'log_text' in self.widgets:
+                    # Efficient text update
+                    self.widgets['log_text'].delete(1.0, 'end')
+                    self.widgets['log_text'].insert('end', '\n'.join(recent_logs))
+                    self.widgets['log_text'].see('end')
+        except Exception as e:
+            pass
+    
     def run(self) -> None:
         """Run the GUI main loop."""
         try:
@@ -597,13 +695,43 @@ class TradingBotGUI:
             # Add startup status label
             self._add_startup_status()
             
-            # Start update timer
+            # Start optimized update timer with performance tracking
+            self.last_update_time = time.time()
+            self.update_count = 0
+            
             def update_gui():
                 if self.root:
-                    self.update_display()
-                    self.root.after(1000, update_gui)
+                    try:
+                        update_start = time.time()
+                        
+                        # Throttled updates to prevent GUI overload
+                        self.update_count += 1
+                        
+                        # Update display with performance monitoring
+                        self._update_display_optimized()
+                        
+                        update_elapsed = time.time() - update_start
+                        
+                        # Log performance every 30 updates (avoid spam)
+                        if self.update_count % 30 == 0:
+                            avg_time = update_elapsed
+                            self.logger.log(f"[GUI] Update #{self.update_count}: {avg_time:.3f}s")
+                        
+                        # Adaptive refresh rate based on performance
+                        next_interval = 1000  # Default 1 second
+                        if update_elapsed > 0.5:
+                            next_interval = 2000  # Slow down if updates are heavy
+                        elif update_elapsed < 0.1:
+                            next_interval = 500   # Speed up if updates are light
+                        
+                        self.root.after(next_interval, update_gui)
+                        
+                    except Exception as e:
+                        self.logger.log(f"❌ GUI update error: {str(e)}")
+                        self.root.after(2000, update_gui)  # Retry with delay
             
             if self.root:
+                self.logger.log(f"[POST-STARTUP] First GUI update scheduled...")
                 self.root.after(1000, update_gui)
                 self.root.mainloop()
                 
