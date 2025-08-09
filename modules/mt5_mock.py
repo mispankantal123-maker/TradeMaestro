@@ -313,9 +313,9 @@ class MockMT5:
         self.orders = {}
         self.deals = []
         self.next_ticket = 100000
-        self.last_error = 0
+        self._last_error_code = 0
     
-    def initialize(self, path: str = "", login: int = None, password: str = "", 
+    def initialize(self, path: str = "", login: Optional[int] = None, password: str = "", 
                   server: str = "", timeout: int = 60000, portable: bool = False) -> bool:
         """Mock MT5 initialization."""
         print("🔄 Mock MT5: Initializing connection...")
@@ -336,7 +336,7 @@ class MockMT5:
         """Mock version information."""
         return (500, 4815, "08 Aug 2025")
     
-    def account_info(self) -> MockAccountInfo:
+    def account_info(self) -> Optional[MockAccountInfo]:
         """Mock account information."""
         if not self.connected:
             return None
@@ -381,7 +381,7 @@ class MockMT5:
         """Mock total symbols count."""
         return len(self.symbols)
     
-    def symbols_get(self, group: str = "*") -> List[MockSymbolInfo]:
+    def symbols_get(self, group: str = "*") -> Optional[List[MockSymbolInfo]]:
         """Mock symbols list."""
         if not self.connected:
             return None
@@ -397,14 +397,14 @@ class MockMT5:
                     filtered.append(symbol)
             return filtered
     
-    def symbol_info(self, symbol: str) -> MockSymbolInfo:
+    def symbol_info(self, symbol: str) -> Optional[MockSymbolInfo]:
         """Mock symbol information."""
         if not self.connected:
             return None
         
         return self.symbols.get(symbol.upper())
     
-    def symbol_info_tick(self, symbol: str) -> MockTick:
+    def symbol_info_tick(self, symbol: str) -> Optional[MockTick]:
         """Mock tick information."""
         if not self.connected:
             return None
@@ -542,7 +542,7 @@ class MockMT5:
         """Mock total positions count."""
         return len(self.positions)
     
-    def positions_get(self, symbol: str = None, ticket: int = None) -> List[MockPosition]:
+    def positions_get(self, symbol: Optional[str] = None, ticket: Optional[int] = None) -> Optional[List[MockPosition]]:
         """Mock positions retrieval."""
         if not self.connected:
             return None
@@ -577,7 +577,7 @@ class MockMT5:
         return updated_positions
     
     def history_deals_get(self, date_from: datetime.datetime, date_to: datetime.datetime,
-                         group: str = "*") -> List[MockDeal]:
+                         group: str = "*") -> Optional[List[MockDeal]]:
         """Mock deals history."""
         if not self.connected:
             return None
@@ -596,7 +596,7 @@ class MockMT5:
     
     def last_error(self) -> int:
         """Mock last error."""
-        return self.last_error
+        return self._last_error_code
     
     def copy_rates_from(self, symbol: str, timeframe: int, date_from: datetime.datetime, count: int):
         """Mock rates data."""

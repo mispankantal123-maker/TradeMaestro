@@ -1,0 +1,65 @@
+Tugas Anda adalah melakukan perbaikan dan refactor total pada bot trading MT5 ini agar:
+1. Sesuai dengan hasil audit kode terbaru.
+2. GUI kembali seperti versi lama (bobot2.py) dengan semua tombol berfungsi.
+3. Siap untuk live trading tanpa bug kritis.
+
+## Fokus Perbaikan Berdasarkan Audit
+Prioritas 1 (Kritis):
+1. modules/strategy.py – 42 errors
+   - Perbaiki None handling & type errors.
+   - Lengkapi logika signal generation untuk semua strategi (HFT, Scalping, Intraday, Arbitrage).
+   - Tambahkan null checks untuk semua indikator sebelum digunakan.
+
+2. modules/gui.py – 5 errors + GUI berantakan
+   - Kembalikan desain GUI seperti di bobot2.py (layout, warna, label, tombol).
+   - Pastikan tombol berikut ada dan berfungsi:
+     - Start Bot
+     - Stop Bot
+     - Emergency Stop
+     - Kalkulator TP/SL
+     - Export Logs
+     - Symbol Validation
+     - Strategy Selector
+     - Auto-lot Toggle
+   - Pastikan update display GUI berjalan tanpa error.
+
+3. modules/news_filter.py – 2 errors
+   - Implementasi integrasi API berita ekonomi.
+   - Filter order saat news berdampak tinggi sesuai konfigurasi sesi.
+
+4. modules/account.py – 3 errors
+   - Perbaiki None handling di currency conversion.
+   - Pastikan ada fallback rate default.
+
+Prioritas 2 (Penting):
+5. Error handling global
+   - Perbaiki semua 303 LSP diagnostics.
+   - Tambahkan try/except + null checks.
+   - Gunakan Optional type hints.
+
+6. Logging & Telegram integration
+   - Pastikan Telegram alert bekerja.
+   - Log semua error kritis dan kirim real-time.
+
+## GUI Requirements
+- Gunakan Tkinter seperti di bobot2.py.
+- Tata letak harus rapi dan intuitif:
+  - Frame utama: Info akun, kontrol bot, info sesi.
+  - Frame risiko: Input TP/SL, % risiko, auto-lot.
+  - Frame monitoring: Daftar posisi aktif, status bot.
+  - Log panel di bawah dengan auto-scroll.
+- Semua tombol harus memiliki event handler yang berfungsi penuh.
+- Tidak boleh ada tombol dummy (fungsi kosong).
+
+## Testing Wajib Sebelum Selesai
+- Unit test semua fungsi risk calculation dan order execution.
+- Uji GUI tombol satu per satu.
+- Simulasikan news filter aktif dan nonaktif.
+- Test start/stop bot + emergency stop di akun demo MT5.
+- Jalankan stress test dengan >50 simbol.
+
+## Output yang Diharapkan
+- Semua error ⚠️ dan ❌ di audit terakhir diperbaiki.
+- GUI rapi dan identik fungsinya seperti bobot2.py.
+- Semua tombol berfungsi tanpa error.
+- Kode bebas dari bug kritis dan siap digunakan di live trading.
