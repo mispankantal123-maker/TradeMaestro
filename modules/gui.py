@@ -145,9 +145,17 @@ class TradingBotGUI:
             self.widgets['strategy_combo'].grid(row=1, column=1, padx=5, pady=5)
             
             # Control buttons row
-            ttk.Button(ctrl_frame, text="🚀 START", command=self._start_bot).grid(row=2, column=0, padx=5, pady=10)
-            ttk.Button(ctrl_frame, text="⏹️ STOP", command=self._stop_bot).grid(row=2, column=1, padx=5, pady=10)
+            self.widgets['start_btn'] = ttk.Button(ctrl_frame, text="🚀 START TRADING", command=self._start_bot)
+            self.widgets['start_btn'].grid(row=2, column=0, padx=5, pady=10)
+            
+            self.widgets['stop_btn'] = ttk.Button(ctrl_frame, text="⏹️ STOP TRADING", command=self._stop_bot, state='disabled')
+            self.widgets['stop_btn'].grid(row=2, column=1, padx=5, pady=10)
+            
             ttk.Button(ctrl_frame, text="🚨 EMERGENCY", command=self._emergency_stop).grid(row=2, column=2, padx=5, pady=10)
+            
+            # Trading Status Indicator
+            self.widgets['trading_status'] = ttk.Label(ctrl_frame, text="🔴 Trading Stopped", foreground='red')
+            self.widgets['trading_status'].grid(row=3, column=0, columnspan=3, padx=5, pady=5)
             
             # Statistics Panel (exact bobot2.py layout)
             stats_frame = ttk.LabelFrame(self.widgets['dashboard_tab'], text="📊 Live Statistics")
@@ -427,7 +435,7 @@ class TradingBotGUI:
     
     # Button handlers (exact bobot2.py match)
     def _start_bot(self):
-        """Start bot with current GUI settings"""
+        """Start trading operations with current GUI settings"""
         try:
             # Validate and apply all GUI settings before starting
             lot = self.get_current_lot()
@@ -435,22 +443,42 @@ class TradingBotGUI:
             sl = self.get_current_sl()
             strategy = self.widgets['strategy_combo'].get()
             
-            self.logger.log(f"🚀 Starting bot with {strategy} strategy: Lot={lot}, TP={tp}, SL={sl}")
+            self.logger.log(f"🚀 Starting trading with {strategy} strategy: Lot={lot}, TP={tp}, SL={sl}")
             
-            if hasattr(self.bot, 'start'):
-                self.bot.start()
+            # Update GUI state
+            self.widgets['start_btn'].config(state='disabled')
+            self.widgets['stop_btn'].config(state='normal')
+            self.widgets['trading_status'].config(text="🟢 Trading Active", foreground='green')
+            
+            # Start trading operations (non-blocking)
+            if hasattr(self.bot, 'start_trading_when_ready'):
+                self.bot.start_trading_when_ready()
+            else:
+                self.logger.log("⚠️ Trading method not available")
                 
         except Exception as e:
-            self.logger.log(f"❌ Error starting bot: {str(e)}")
+            self.logger.log(f"❌ Error starting trading: {str(e)}")
+            # Reset GUI state on error
+            self.widgets['start_btn'].config(state='normal')
+            self.widgets['stop_btn'].config(state='disabled')
+            self.widgets['trading_status'].config(text="🔴 Trading Error", foreground='red')
     
     def _stop_bot(self):
-        """Stop bot"""
+        """Stop trading operations"""
         try:
-            self.logger.log("⏹️ Stopping bot...")
+            self.logger.log("⏹️ Stopping trading operations...")
+            
+            # Update GUI state
+            self.widgets['start_btn'].config(state='normal')
+            self.widgets['stop_btn'].config(state='disabled')
+            self.widgets['trading_status'].config(text="🔴 Trading Stopped", foreground='red')
+            
+            # Stop trading
             if hasattr(self.bot, 'stop'):
                 self.bot.stop()
+                
         except Exception as e:
-            self.logger.log(f"❌ Error stopping bot: {str(e)}")
+            self.logger.log(f"❌ Error stopping trading: {str(e)}")
     
     def _emergency_stop(self):
         """Emergency stop - close all positions"""

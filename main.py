@@ -246,7 +246,7 @@ class TradingBot:
             self.logger.log(f"❌ Error starting GUI: {str(e)}")
     
     def _initialize_components_with_timeout(self, timeout: int = 30) -> bool:
-        """Initialize bot components with timeout to prevent hanging."""
+        """Initialize bot components with timeout to prevent hanging - NO TRADING LOOP."""
         try:
             import time
             start_time = time.time()
@@ -295,7 +295,7 @@ class TradingBot:
             self.logger.log(f"[STARTUP] Step 3d: Initializing strategy manager...")
             step_start = time.time()
             
-            # Initialize strategy manager
+            # Initialize strategy manager (COMPONENTS ONLY - NO TRADING LOOP)
             self.strategy_manager.initialize(self.connection.mt5, self.account_manager)
             
             elapsed = time.time() - step_start
@@ -303,12 +303,31 @@ class TradingBot:
             
             total_elapsed = time.time() - start_time
             self.logger.log(f"[STARTUP] ✅ All components initialized in {total_elapsed:.3f}s")
+            self.logger.log(f"[STARTUP] 📌 Trading loop NOT started - GUI will remain responsive")
             
             return True
             
         except Exception as e:
             self.logger.log(f"❌ Error initializing components: {str(e)}")
             return False
+    
+    def start_trading_when_ready(self) -> None:
+        """Start trading loop only when explicitly called (manual start)."""
+        try:
+            if not self.running:
+                self.logger.log(f"[TRADING] 🚀 Starting trading operations...")
+                self.running = True
+                
+                # Start main trading loop in separate thread
+                self.main_thread = threading.Thread(target=self._main_loop, daemon=True)
+                self.main_thread.start()
+                
+                self.logger.log("✅ Trading operations started successfully")
+            else:
+                self.logger.log("⚠️ Trading already running")
+                
+        except Exception as e:
+            self.logger.log(f"❌ Error starting trading: {str(e)}")
     
     def run_gui(self):
         """Run the bot with GUI interface (alias for start_gui)."""
