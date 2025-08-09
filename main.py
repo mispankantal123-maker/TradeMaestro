@@ -144,6 +144,12 @@ class TradingBot:
         try:
             from modules.gui import TradingBotGUI
             self.gui = TradingBotGUI(self, self.logger)
+            
+            # CRITICAL: Set GUI reference in strategy manager for parameter access
+            if self.strategy_manager:
+                self.strategy_manager.set_gui_reference(self.gui)
+                self.logger.log("✅ GUI-Strategy integration completed")
+            
             self.gui.run()
         except Exception as e:
             self.logger.log(f"❌ Error starting GUI: {str(e)}")

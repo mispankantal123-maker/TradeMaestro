@@ -497,6 +497,15 @@ class StrategyManager:
             self.logger.log(f"❌ Error setting strategy: {str(e)}")
             return False
     
+    def set_gui_reference(self, gui_instance):
+        """Set GUI reference for parameter access (exact bobot2.py integration)"""
+        try:
+            self.gui = gui_instance
+            self.logger.log("✅ GUI reference set for strategy manager")
+        except Exception as e:
+            self.logger.log(f"❌ Error setting GUI reference: {str(e)}")
+            return False
+    
     def get_current_strategy(self) -> str:
         """Get the current trading strategy."""
         return self.current_strategy
