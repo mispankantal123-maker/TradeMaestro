@@ -1,0 +1,60 @@
+Saya ingin Anda membuat ulang bot trading MT5 otomatis berbasis Python, GUI Tkinter, dan sistem modular yang rapi, untuk digunakan dalam LIVE TRADING sungguhan.
+Semua requirement, fitur, strategi, dan sistem dari bot lama saya (bobot2.py) HARUS terimplementasi sepenuhnya.
+
+## Tujuan
+Membangun bot trading yang:
+1. Terstruktur modular (setiap fungsi utama di file/modul terpisah).
+2. Terhubung ke MT5 dengan koneksi stabil (auto-reconnect jika terputus).
+3. GUI Tkinter berfungsi penuh untuk kontrol bot, monitoring, kalkulasi TP/SL, dan export log.
+4. Mengintegrasikan sistem strategi, risk management, dan order execution tanpa error.
+5. Siap digunakan langsung untuk trading live tanpa bug kritis.
+
+## Arsitektur yang Diminta
+Buat struktur folder seperti ini:
+- main.py → entry point bot, inisialisasi dan loop utama.
+- config.py → semua variabel konfigurasi & constants.
+- modules/
+    ├── connection.py → koneksi MT5, status check, auto-reconnect, diagnosa.
+    ├── symbols.py → validasi & aktivasi simbol otomatis, deteksi gold, saran simbol.
+    ├── account.py → info akun, posisi, currency conversion.
+    ├── risk.py → pip value calculation, auto-lot sizing, validasi TP/SL.
+    ├── strategy.py → strategi HFT, Scalping, Intraday, Arbitrage & logic pemilihan.
+    ├── orders.py → open/close/modify order, trade signal execution.
+    ├── sessions.py → manajemen sesi (Asia/London/NY/Overlap) & penyesuaian parameter.
+    ├── logging_utils.py → logger terpusat (console, GUI, file, Telegram).
+    ├── indicators.py → kalkulasi indikator teknikal (EMA, RSI, MACD, ATR, Bollinger, Stochastic).
+    ├── news_filter.py → filter berita besar (high-impact news).
+    ├── gui.py → class GUI Tkinter (start/stop, emergency stop, kalkulator TP/SL, monitoring posisi).
+    ├── utils.py → helper umum & cleanup resources.
+
+## Fitur yang HARUS Ada (mengacu bobot2.py)
+- Multi-attempt koneksi MT5 + diagnosa lengkap.
+- Validasi & aktivasi simbol otomatis (mencoba semua variasi nama).
+- TP/SL multi-unit: pips, price, %, currency (termasuk konversi antar mata uang).
+- Auto-lot sizing berbasis risk % dan SL pips.
+- Strategi lengkap: HFT, Scalping, Intraday, Arbitrage.
+- Session-aware adjustment (lot, TP, SL, preferred pairs).
+- Risk control: max loss streak, max drawdown, profit target, daily loss limit.
+- High-impact news filter.
+- Logging terpusat + export + integrasi Telegram.
+- GUI interaktif untuk semua kontrol utama.
+- Cleanup & memory management untuk mencegah leak.
+- Error handling penuh, semua exception harus ditangani dengan logging.
+
+## Standar Kode
+- Python 3.10+
+- PEP8 compliant.
+- Gunakan type hints.
+- Semua modul punya docstring jelas.
+- Fungsi modular & reusable.
+- Unit test minimal untuk fungsi kritis.
+- Harus bebas error saat dijalankan (integrasi sistem, GUI, dan MT5 berjalan sempurna).
+
+## Output yang Diharapkan
+- Kode lengkap untuk semua modul di atas.
+- Struktur folder sesuai spesifikasi.
+- main.py menjalankan bot live trading (bukan simulasi).
+- Instruksi run di Replit untuk live trading MT5.
+
+Mulailah dengan membuat struktur folder dan file kosong + template fungsi, lalu isi setiap modul dengan implementasi lengkap.
+Pastikan semua sistem terintegrasi dengan sempurna dan bebas error.
