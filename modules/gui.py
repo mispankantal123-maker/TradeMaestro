@@ -64,8 +64,9 @@ class TradingBotGUI:
     def _create_menu_bar(self) -> None:
         """Create menu bar."""
         try:
-            menubar = tk.Menu(self.root)
-            self.root.config(menu=menubar)
+            if self.root:
+                menubar = tk.Menu(self.root)
+                self.root.config(menu=menubar)
             
             # File menu
             file_menu = tk.Menu(menubar, tearoff=0)
@@ -356,7 +357,8 @@ class TradingBotGUI:
         """Schedule periodic GUI updates."""
         try:
             self._update_status()
-            self.root.after(GUI_UPDATE_INTERVAL, self._schedule_updates)
+            if self.root:
+                self.root.after(GUI_UPDATE_INTERVAL, self._schedule_updates)
         except Exception as e:
             self.logger.log(f"❌ Error scheduling updates: {str(e)}")
     
@@ -671,12 +673,15 @@ Created with ❤️ for professional traders"""
                 result = messagebox.askyesno("Quit", "Bot is still running. Stop bot and quit?")
                 if result:
                     self.bot.stop()
-                    self.root.destroy()
+                    if self.root:
+                        self.root.destroy()
             else:
-                self.root.destroy()
+                if self.root:
+                    self.root.destroy()
         except Exception as e:
             self.logger.log(f"❌ Error closing window: {str(e)}")
-            self.root.destroy()
+            if self.root:
+                self.root.destroy()
     
     def run(self) -> None:
         """Run the GUI main loop."""

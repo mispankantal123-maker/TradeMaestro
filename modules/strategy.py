@@ -357,7 +357,7 @@ class StrategyManager:
             action = None
             
             # Trend-following with volatility filter
-            if all([ema_fast, ema_slow, atr]) and len(ema_fast) >= 5:
+            if all([ema_fast, ema_slow, atr]) and ema_fast and len(ema_fast) >= 5 and ema_slow and len(ema_slow) >= 5:
                 # Strong trend detection
                 trend_strength = 0
                 for i in range(1, 5):
