@@ -1,0 +1,84 @@
+Prompt Audit – Startup Freeze Investigation (MT5 Bot)
+Lakukan audit menyeluruh terhadap proses startup MT5 trading bot untuk menemukan penyebab GUI freeze atau status “Not Responding” sebelum trading dimulai.
+
+Langkah Audit yang Harus Dilakukan:
+
+Mapping Alur Startup
+
+Identifikasi semua fungsi yang dijalankan saat bot pertama kali dibuka.
+
+Pisahkan proses GUI initialization, konfigurasi, koneksi MT5, load data, dan inisialisasi strategi.
+
+Titik Potensi Blocking
+
+Temukan semua operasi blocking yang dijalankan di thread utama (GUI).
+
+Cari pemanggilan MT5 API seperti:
+
+MetaTrader5.initialize()
+
+MetaTrader5.symbol_info()
+
+MetaTrader5.copy_rates_from_pos()
+
+Periksa apakah ada loop berat (iterasi besar, indikator, AI analysis) di awal.
+
+Pengukuran Waktu Eksekusi
+
+Tambahkan logging timestamp di setiap langkah startup.
+
+Catat step terakhir sebelum freeze terjadi.
+
+Gunakan format log:
+
+vbnet
+Copy
+Edit
+2025-08-09 14:32:12 [DEBUG] Step 2: Connecting to MT5...
+Timeout & Error Handling
+
+Audit apakah pemanggilan API MT5 memiliki timeout.
+
+Jika tidak, sarankan implementasi timeout menggunakan threading.Thread + join(timeout=...).
+
+Threading Review
+
+Periksa apakah proses berat dijalankan di thread terpisah atau masih di main loop GUI.
+
+Jika tidak, rekomendasikan migrasi ke background thread (threading.Thread / QThread).
+
+Simulasi & Stress Test
+
+Jalankan bot dengan koneksi MT5 offline untuk lihat apakah freeze tetap terjadi.
+
+Uji startup dengan simbol/timeframe berbeda (EURUSD M1, BTCUSD M5, dll.).
+
+Ukur durasi freeze di setiap kondisi.
+
+Output Audit
+
+Laporan lokasi pasti di mana freeze terjadi (step terakhir sebelum macet).
+
+Daftar fungsi/block code yang perlu dipindahkan ke thread terpisah.
+
+Saran optimisasi supaya startup <2 detik dan GUI langsung responsif.
+
+Target Audit:
+
+Identifikasi & eliminasi semua proses blocking di main loop GUI.
+
+Pastikan semua panggilan berat (koneksi, fetch data, load strategi) dijalankan asinkron.
+
+Hasilkan laporan waktu eksekusi per step (profiling startup).
+
+Rekomendasikan implementasi timeout pada semua request MT5.
+
+Output yang Diharapkan:
+
+Log eksekusi startup dengan timestamp per step.
+
+Analisis penyebab freeze dan lokasi pastinya di kode.
+
+Rencana patch untuk memindahkan proses berat ke background thread.
+
+Estimasi durasi startup setelah optimisasi.

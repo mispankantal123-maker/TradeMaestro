@@ -594,6 +594,9 @@ class TradingBotGUI:
         try:
             self.create_main_window()
             
+            # Add startup status label
+            self._add_startup_status()
+            
             # Start update timer
             def update_gui():
                 if self.root:
@@ -606,6 +609,31 @@ class TradingBotGUI:
                 
         except Exception as e:
             self.logger.log(f"❌ Error running GUI: {str(e)}")
+    
+    def _add_startup_status(self) -> None:
+        """Add startup status indicator to GUI."""
+        try:
+            if self.root and 'dashboard_tab' in self.widgets:
+                self.startup_frame = ttk.Frame(self.widgets['dashboard_tab'])
+                self.startup_frame.grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+                
+                ttk.Label(self.startup_frame, text="🚀 Status:").pack(side='left', padx=5)
+                self.startup_status = ttk.Label(self.startup_frame, text="⏳ Initializing components...", foreground='orange')
+                self.startup_status.pack(side='left', padx=5)
+        except Exception as e:
+            self.logger.log(f"❌ Error adding startup status: {str(e)}")
+    
+    def _update_startup_status(self, status: str) -> None:
+        """Update startup status display."""
+        try:
+            if hasattr(self, 'startup_status'):
+                self.startup_status.config(text=status)
+                if "✅" in status:
+                    self.startup_status.config(foreground='green')
+                elif "❌" in status:
+                    self.startup_status.config(foreground='red')
+        except Exception as e:
+            self.logger.log(f"❌ Error updating startup status: {str(e)}")
     
     def _on_closing(self) -> None:
         """Handle window close event."""

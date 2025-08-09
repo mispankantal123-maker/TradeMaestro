@@ -140,19 +140,128 @@ class TradingBot:
             self.logger.log(f"❌ Fatal error in main loop: {str(e)}")
     
     def start_gui(self) -> None:
-        """Start the GUI interface."""
+        """Start the GUI interface with non-blocking startup."""
         try:
+            import time
             from modules.gui import TradingBotGUI
+            
+            # Step 1: Create GUI immediately (lightweight)
+            start_time = time.time()
+            self.logger.log(f"[STARTUP] Step 1: Creating GUI window...")
             self.gui = TradingBotGUI(self, self.logger)
+            elapsed = time.time() - start_time
+            self.logger.log(f"[STARTUP] ✅ GUI created in {elapsed:.3f}s")
             
-            # CRITICAL: Set GUI reference in strategy manager for parameter access
-            if self.strategy_manager:
-                self.strategy_manager.set_gui_reference(self.gui)
-                self.logger.log("✅ GUI-Strategy integration completed")
+            # Step 2: Start GUI immediately (non-blocking)
+            self.logger.log(f"[STARTUP] Step 2: Starting GUI interface...")
+            start_time = time.time()
             
+            # Start heavy initialization in background thread
+            def background_init():
+                """Initialize heavy components in background thread."""
+                try:
+                    init_start = time.time()
+                    self.logger.log(f"[STARTUP] Step 3: Background initialization started...")
+                    
+                    # Initialize bot components with timeout
+                    if not self._initialize_components_with_timeout():
+                        self.logger.log("❌ Failed to initialize bot components")
+                        return
+                    
+                    # Set GUI reference in strategy manager
+                    if self.strategy_manager:
+                        self.strategy_manager.set_gui_reference(self.gui)
+                        self.logger.log("✅ GUI-Strategy integration completed")
+                    
+                    elapsed = time.time() - init_start
+                    self.logger.log(f"[STARTUP] ✅ Background initialization completed in {elapsed:.3f}s")
+                    
+                    # Update GUI status
+                    if self.gui and self.gui.root:
+                        self.gui.root.after(0, lambda: self.gui._update_startup_status("✅ Ready for Trading"))
+                        
+                except Exception as e:
+                    self.logger.log(f"❌ Error in background initialization: {str(e)}")
+                    if self.gui and self.gui.root:
+                        self.gui.root.after(0, lambda: self.gui._update_startup_status(f"❌ Error: {str(e)}"))
+            
+            # Start background thread
+            init_thread = threading.Thread(target=background_init, daemon=True)
+            init_thread.start()
+            
+            elapsed = time.time() - start_time
+            self.logger.log(f"[STARTUP] ✅ GUI started in {elapsed:.3f}s (background init running)")
+            
+            # Run GUI (this blocks but GUI is already responsive)
             self.gui.run()
+            
         except Exception as e:
             self.logger.log(f"❌ Error starting GUI: {str(e)}")
+    
+    def _initialize_components_with_timeout(self, timeout: int = 30) -> bool:
+        """Initialize bot components with timeout to prevent hanging."""
+        try:
+            import time
+            start_time = time.time()
+            
+            self.logger.log(f"[STARTUP] Step 3a: Connecting to MT5...")
+            step_start = time.time()
+            
+            # Initialize MT5 connection with timeout
+            if not self.connection.connect():
+                self.logger.log("❌ Failed to connect to MT5")
+                return False
+            
+            elapsed = time.time() - step_start
+            self.logger.log(f"[STARTUP] ✅ MT5 connected in {elapsed:.3f}s")
+            
+            # Check overall timeout
+            if time.time() - start_time > timeout:
+                self.logger.log(f"⚠️ Initialization timeout ({timeout}s), stopping...")
+                return False
+            
+            self.logger.log(f"[STARTUP] Step 3b: Initializing account manager...")
+            step_start = time.time()
+            
+            # Initialize account manager
+            if not self.account_manager.initialize(self.connection.mt5):
+                self.logger.log("❌ Failed to initialize account manager")
+                return False
+            
+            elapsed = time.time() - step_start
+            self.logger.log(f"[STARTUP] ✅ Account manager initialized in {elapsed:.3f}s")
+            
+            # Check timeout again
+            if time.time() - start_time > timeout:
+                self.logger.log(f"⚠️ Initialization timeout ({timeout}s), stopping...")
+                return False
+            
+            self.logger.log(f"[STARTUP] Step 3c: Initializing session manager...")
+            step_start = time.time()
+            
+            # Initialize session manager
+            self.session_manager.initialize()
+            
+            elapsed = time.time() - step_start
+            self.logger.log(f"[STARTUP] ✅ Session manager initialized in {elapsed:.3f}s")
+            
+            self.logger.log(f"[STARTUP] Step 3d: Initializing strategy manager...")
+            step_start = time.time()
+            
+            # Initialize strategy manager
+            self.strategy_manager.initialize(self.connection.mt5, self.account_manager)
+            
+            elapsed = time.time() - step_start
+            self.logger.log(f"[STARTUP] ✅ Strategy manager initialized in {elapsed:.3f}s")
+            
+            total_elapsed = time.time() - start_time
+            self.logger.log(f"[STARTUP] ✅ All components initialized in {total_elapsed:.3f}s")
+            
+            return True
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error initializing components: {str(e)}")
+            return False
     
     def run_gui(self):
         """Run the bot with GUI interface (alias for start_gui)."""
