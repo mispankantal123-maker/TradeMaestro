@@ -1,0 +1,89 @@
+Audit – START BOT MainThread Freeze Detector
+Tujuan:
+Melakukan audit mendalam untuk menemukan semua pemanggilan fungsi _start_bot atau proses awal trading yang dijalankan di main thread, serta mengidentifikasi seluruh operasi berat yang menyebabkan GUI freeze saat bot start.
+
+1. Pencarian Global Pemanggilan _start_bot
+Cari seluruh pemanggilan _start_bot di repo:
+
+bash
+Copy
+Edit
+git grep "_start_bot"
+Untuk setiap hasil:
+
+Catat file + nomor baris.
+
+Periksa apakah pemanggilan dilakukan langsung dari event handler GUI (misalnya button.clicked.connect, command=..., atau bind di Tkinter).
+
+Tandai jika dipanggil tanpa threading.Thread, ThreadPoolExecutor, atau QThread.
+
+2. Audit Jalur Eksekusi START BOT
+Telusuri call stack dari tombol START → _start_bot → launching trading strategies.
+
+Catat semua fungsi di jalur ini.
+
+Pastikan setiap fungsi:
+
+Tidak melakukan loop besar atau blocking call di main thread.
+
+Jika berat, harus dijalankan di thread worker.
+
+3. Deteksi Heavy Operation di MainThread
+Cari di seluruh repo (pakai regex / grep) untuk fungsi berat yang mungkin berjalan di main thread saat start:
+
+MT5 API:
+
+bash
+Copy
+Edit
+git grep -E "mt5\.(copy_rates|symbol_info|symbol_select|positions_get|orders_get)"
+I/O besar:
+
+bash
+Copy
+Edit
+git grep -E "open\(.*rb|read|load|pickle|json"
+Perhitungan indikator:
+
+bash
+Copy
+Edit
+git grep -E "(talib|pandas|numpy).*EMA|SMA|RSI|MACD"
+Model AI:
+
+bash
+Copy
+Edit
+git grep -E "(load_model|predict|inference)"
+4. Threading Verification
+Di semua fungsi jalur START BOT, tambahkan:
+
+python
+Copy
+Edit
+import threading
+print(f"[DEBUG] {__name__} running in thread: {threading.current_thread().name}")
+Jalankan bot, catat fungsi yang masih berjalan di MainThread.
+
+5. Rekomendasi Perbaikan
+Untuk setiap operasi berat di main thread:
+
+Pindahkan ke worker thread:
+
+python
+Copy
+Edit
+from threading import Thread
+Thread(target=heavy_function, daemon=True).start()
+Jika butuh update UI, gunakan mekanisme aman (after() di Tkinter, signal-slot di PyQt).
+
+Untuk batch data besar, pecah jadi beberapa chunk dengan time.sleep(0.05) di antaranya.
+
+6. Output Laporan
+List semua file & baris pemanggilan _start_bot.
+
+Call stack penuh sampai launching trading strategies.
+
+Daftar semua heavy operation yang masih di main thread.
+
+Rekomendasi PR-ready untuk setiap masalah.
