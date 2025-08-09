@@ -26,6 +26,10 @@ args = "MT5 Trading Bot GUI"
 task = "workflow.run"
 args = "Demo Trading Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Windows Safe Bot"
+
 [[workflows.workflow]]
 name = "MT5 Trading Bot"
 author = "agent"
@@ -58,3 +62,14 @@ args = "python main.py"
 
 [workflows.workflow.metadata]
 outputType = "vnc"
+
+[[workflows.workflow]]
+name = "Windows Safe Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main_windows_safe.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
