@@ -775,7 +775,14 @@ class TradingBotGUI:
             if self.root:
                 self.logger.log(f"[POST-STARTUP] First GUI update scheduled...")
                 self.root.after(1000, update_gui)
-                self.root.mainloop()
+                
+                # FREEZE FIX #5: Non-blocking mainloop with timeout on Windows
+                try:
+                    self.root.mainloop()
+                except KeyboardInterrupt:
+                    self.logger.log("🛑 GUI interrupted by user")
+                except Exception as e:
+                    self.logger.log(f"❌ GUI mainloop error: {str(e)}")
                 
         except Exception as e:
             self.logger.log(f"❌ Error running GUI: {str(e)}")

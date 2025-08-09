@@ -138,8 +138,10 @@ class MT5Connection:
                     continue
             
             if attempt < MAX_CONNECTION_ATTEMPTS - 1:
-                self.logger.log(f"⏳ Waiting {CONNECTION_RETRY_DELAY}s before retry...")
-                time.sleep(CONNECTION_RETRY_DELAY)
+                # FREEZE FIX #3: Reduce delay to prevent long blocking
+                reduced_delay = min(CONNECTION_RETRY_DELAY, 1.0)  # Max 1 second
+                self.logger.log(f"⏳ Waiting {reduced_delay}s before retry...")
+                time.sleep(reduced_delay)
         
         return False
     

@@ -116,8 +116,15 @@ class StrategyManager:
                     batch_elapsed = time.time() - batch_start
                     self.logger.log(f"[STRATEGY] Batch completed in {batch_elapsed:.3f}s")
                     
-                    # Yield control between batches (prevent blocking)
+                    # FREEZE FIX #4: Yield control between batches with progress check
                     time.sleep(0.1)
+                    
+                    # Additional yield for GUI responsiveness on Windows
+                    if hasattr(self, 'gui') and self.gui and hasattr(self.gui, 'root'):
+                        try:
+                            self.gui.root.update_idletasks()  # Allow GUI to update
+                        except:
+                            pass
                 
                 total_elapsed = time.time() - exec_start
                 self.logger.log(f"[STRATEGY] ✅ Strategy execution completed in {total_elapsed:.3f}s")

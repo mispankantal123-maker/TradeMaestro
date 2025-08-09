@@ -193,7 +193,7 @@ class FailSafeManager:
         """Background safety monitoring loop."""
         while self.monitoring_active:
             try:
-                # Check safety conditions every 30 seconds
+                # FREEZE FIX #6: Check safety conditions every 10 seconds (was 30)
                 safe, reason = self.check_safety_conditions()
                 
                 if not safe and not self.auto_pause_active and not self.emergency_stop_triggered:
@@ -203,7 +203,7 @@ class FailSafeManager:
                     else:
                         self.auto_pause_trading(reason)
                 
-                time.sleep(30)  # Check every 30 seconds
+                time.sleep(10)  # FREEZE FIX: Check every 10 seconds (was 30)
                 
             except Exception as e:
                 self.logger.log(f"❌ Safety monitor error: {str(e)}")
@@ -456,7 +456,8 @@ class SelfHealingSystem:
                     
                     self.last_connection_check = current_time
                 
-                time.sleep(30)  # Check every 30 seconds
+                # FREEZE FIX #7: Healing loop faster checks
+                time.sleep(15)  # Check every 15 seconds (was 30)
                 
             except Exception as e:
                 self.logger.log(f"❌ Self-healing loop error: {str(e)}")
