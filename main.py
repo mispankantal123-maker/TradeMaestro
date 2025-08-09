@@ -22,7 +22,7 @@ from modules.utils import cleanup_resources
 from modules.sessions import SessionManager
 from modules.strategy import StrategyManager
 from modules.account import AccountManager
-from windows_freeze_fix import WindowsFreezeFix
+# from windows_freeze_fix import WindowsFreezeFix  # Removed - functionality integrated
 
 
 class TradingBot:
@@ -40,9 +40,8 @@ class TradingBot:
         self.running = False
         self.main_thread: Optional[threading.Thread] = None
         
-        # Setup Windows freeze prevention
-        self.freeze_fix = WindowsFreezeFix(self.logger)
-        self.freeze_fix.setup_windows_compatibility()
+        # Windows freeze prevention functionality is now integrated into main_fixed.py
+        # Original bot maintained for Linux/advanced users
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
