@@ -1,0 +1,49 @@
+Saya ingin Anda membuat ulang bot trading MT5 otomatis berbasis Python, GUI Tkinter, dan sistem modular yang rapi. 
+Gunakan arsitektur package Python (folder + file terpisah) agar mudah dipelihara, berdasarkan semua fitur dan strategi dari bot lama saya.
+
+## 1. Arsitektur yang Diminta
+Buat struktur folder seperti ini:
+- main.py → entry point bot, hanya untuk inisialisasi dan loop utama.
+- config.py → semua variabel konfigurasi & constants.
+- modules/
+    ├── connection.py → fungsi koneksi MT5, pengecekan status, auto-reconnect.
+    ├── symbols.py → validasi & aktivasi simbol, deteksi gold, saran simbol.
+    ├── account.py → info akun, posisi, currency conversion.
+    ├── risk.py → kalkulasi pip value, auto-lot sizing, validasi TP/SL.
+    ├── strategy.py → semua strategi (HFT, Scalping, Intraday, Arbitrage) & logic pemilihan.
+    ├── orders.py → open order, close order, modify order, trade signal execution.
+    ├── sessions.py → manajemen sesi (Asia/London/NY/Overlap) & penyesuaian parameter.
+    ├── logging_utils.py → logger terpusat, export logs, integrasi Telegram.
+    ├── indicators.py → kalkulasi indikator teknikal (EMA, RSI, MACD, ATR, Bollinger, Stochastic).
+    ├── news_filter.py → filter high-impact news.
+    ├── gui.py → class GUI Tkinter, kontrol bot, kalkulator TP/SL, monitoring posisi.
+    ├── utils.py → helper umum & cleanup resources.
+
+## 2. Fitur yang Harus Ada (diambil dari bot lama saya)
+- Multi-attempt koneksi MT5 + diagnosa lengkap.
+- Validasi & aktivasi simbol otomatis (dengan variasi nama).
+- TP/SL multi-unit (pips, price, %, currency).
+- Auto-lot sizing berbasis risiko % dan SL pips.
+- Strategi HFT, Scalping, Intraday, Arbitrage.
+- Session-aware adjustment (lot, TP, SL, preferred pairs).
+- Risk control (max loss streak, max drawdown, profit target, daily loss limit).
+- High-impact news filter.
+- Logging terpusat (console + GUI + file + Telegram).
+- GUI interaktif (start/stop bot, emergency stop, kalkulator TP/SL, export logs).
+- Cleanup & memory management.
+
+## 3. Standar Kode
+- Python 3.10+
+- PEP8 compliant.
+- Gunakan type hints.
+- Semua modul harus memiliki docstring lengkap.
+- Fungsi harus modular dan reusable.
+- Siapkan kerangka test (misalnya unittest) untuk fungsi kritis.
+
+## 4. Output yang Diharapkan
+- Kode lengkap untuk semua modul di atas.
+- Struktur folder sesuai spesifikasi.
+- `main.py` memanggil modul-modul tersebut untuk menjalankan bot.
+- Contoh penggunaan / run instructions di Replit.
+
+Mulailah dengan membuat struktur folder dan file kosong beserta template fungsi, lalu isi tiap modul satu per satu.
