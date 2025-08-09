@@ -1,0 +1,61 @@
+1. Missing Feature Analysis
+Identifikasi semua fitur bobot2.py yang belum ada di bot ini.
+
+Beri tanda ❌ Missing atau ⚠️ Partial sesuai tingkat implementasi.
+
+Sertakan dampak langsung dari tiap fitur yang hilang terhadap performa bot.
+
+2. Parameter Handling
+Periksa apakah ada pre-start settings system seperti bobot2.py.
+
+Pastikan ada parameter storage (self.strategy_params) untuk setiap strategi.
+
+Periksa apakah ada method GUI retrieval seperti get_current_lot(), get_current_tp(), get_current_sl(), get_current_tp_unit(), get_current_sl_unit().
+
+3. Strategy Integration
+Pastikan semua strategi memanggil parameter dari GUI/self.strategy_params, bukan hardcoded.
+
+Cek apakah multi-unit TP/SL (pips, price, %, currency) sudah terintegrasi di semua strategi.
+
+Pastikan logic konversi TP/SL berdasarkan unit berjalan konsisten.
+
+4. GUI Layout & UX
+Periksa apakah layout tab sama dengan bobot2.py (4 panel strategi, 2x2 grid, masing-masing punya setting sendiri).
+
+Evaluasi apakah input user mudah diakses dan tersimpan sebelum start.
+
+Identifikasi bug GUI (misalnya input tidak terhubung ke logic).
+
+5. Logic & Signal Validation
+Audit alur pengambilan sinyal (indikator, timeframe, validasi).
+
+Pastikan tidak ada order ganda karena sinyal yang sama.
+
+Cek apakah TP/SL dihitung dengan benar sesuai unit yang dipilih.
+
+Pastikan lot sizing sesuai pengaturan.
+
+6. Error Handling & Stability
+Cari semua potensi crash (misal float() dari input kosong).
+
+Tambah pengecekan koneksi MT5 sebelum kirim order.
+
+Pastikan bot bisa recovery setelah restart tanpa kehilangan konfigurasi.
+
+7. Performance & Optimization
+Audit loop utama agar tidak membebani CPU.
+
+Optimalkan event handling di GUI.
+
+Periksa apakah ada memory leak (misal data lama tidak dibersihkan).
+
+Deliverables Output yang Diharapkan:
+Tabel Perbandingan bobot2.py vs Bot Sekarang (per fitur).
+
+Daftar Bug (logika, sinyal, memori, GUI).
+
+Daftar Missing Features dan solusi teknis implementasinya.
+
+Rencana Patch Step-by-Step untuk perbaikan dan pematangan bot.
+
+Prioritas Implementasi (High/Medium/Low).
