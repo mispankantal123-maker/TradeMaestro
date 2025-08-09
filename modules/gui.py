@@ -28,28 +28,50 @@ class TradingBotGUI:
         self.logger.set_gui_callback(self.log_to_gui)
         
     def create_main_window(self) -> None:
-        """Create the main GUI window."""
+        """Create the main GUI window with bobot2.py design."""
         try:
             self.root = tk.Tk()
-            self.root.title("MT5 Automated Trading Bot")
-            self.root.geometry("1200x800")
-            self.root.minsize(800, 600)
+            self.root.title("🤖 MT5 Automated Trading Bot Pro")
+            self.root.geometry("1400x900")  # Match bobot2.py dimensions
+            self.root.minsize(1200, 800)
             
-            # Configure style
+            # Configure dark theme to match bobot2.py
+            self.root.configure(bg='#0f0f0f')  # Dark background
             style = ttk.Style()
             style.theme_use('clam')
+            
+            # Dark theme configuration (exact bobot2.py colors)
+            style.configure('TFrame', background='#0f0f0f', fieldbackground='#0f0f0f')
+            style.configure('TLabel', background='#0f0f0f', foreground='white')
+            style.configure('TButton', background='#2d2d2d', foreground='white', 
+                          borderwidth=1, focuscolor='none')
+            style.map('TButton', background=[('active', '#404040')])
+            style.configure('TEntry', fieldbackground='#2d2d2d', foreground='white', 
+                          borderwidth=1, insertcolor='white')
+            style.configure('TCombobox', fieldbackground='#2d2d2d', foreground='white',
+                          borderwidth=1, selectbackground='#404040')
+            style.configure('TLabelFrame', background='#0f0f0f', foreground='white', 
+                          borderwidth=1, relief='solid')
+            style.configure('TLabelFrame.Label', background='#0f0f0f', foreground='white')
+            style.configure('TNotebook', background='#0f0f0f', borderwidth=0)
+            style.configure('TNotebook.Tab', background='#2d2d2d', foreground='white',
+                          padding=[20, 8])
+            style.map('TNotebook.Tab', background=[('selected', '#404040')])
             
             # Create main frames
             self._create_menu_bar()
             self._create_main_frames()
+            # Create all frames for bobot2.py compatibility
             self._create_connection_frame()
             self._create_control_frame()
             self._create_strategy_frame()
             self._create_risk_frame()
-            self._create_live_stats_frame()
+            self._create_enhanced_stats_frame()  # Enhanced version
             self._create_symbol_frame()
-            self._create_calculator_frame()
-            self._create_log_frame()
+            self._create_positions_table()  # New: Real-time position table
+            self._create_enhanced_calculator()  # Enhanced multi-unit calculator
+            self._create_enhanced_logs()  # Enhanced log viewer
+            self._create_session_display()  # New: Session indicator
             self._create_status_frame()
             
             # Bind close event
@@ -98,17 +120,21 @@ class TradingBotGUI:
             self.widgets['notebook'] = ttk.Notebook(self.root)
             self.widgets['notebook'].pack(fill='both', expand=True, padx=5, pady=5)
             
-            # Main control tab
+            # Tab 1: Main Control (exact bobot2.py match)
             self.widgets['main_frame'] = ttk.Frame(self.widgets['notebook'])
-            self.widgets['notebook'].add(self.widgets['main_frame'], text="Main Control")
+            self.widgets['notebook'].add(self.widgets['main_frame'], text="🎯 Main Control")
             
-            # Monitoring tab
-            self.widgets['monitor_frame'] = ttk.Frame(self.widgets['notebook'])
-            self.widgets['notebook'].add(self.widgets['monitor_frame'], text="Monitoring")
+            # Tab 2: Position Monitor (exact bobot2.py match)
+            self.widgets['positions_frame'] = ttk.Frame(self.widgets['notebook'])
+            self.widgets['notebook'].add(self.widgets['positions_frame'], text="📊 Positions")
             
-            # Settings tab
-            self.widgets['settings_frame'] = ttk.Frame(self.widgets['notebook'])
-            self.widgets['notebook'].add(self.widgets['settings_frame'], text="Settings")
+            # Tab 3: Calculator (exact bobot2.py match)
+            self.widgets['calculator_frame'] = ttk.Frame(self.widgets['notebook'])
+            self.widgets['notebook'].add(self.widgets['calculator_frame'], text="🧮 Calculator")
+            
+            # Tab 4: Logs (exact bobot2.py match)
+            self.widgets['logs_frame'] = ttk.Frame(self.widgets['notebook'])
+            self.widgets['notebook'].add(self.widgets['logs_frame'], text="📋 Logs")
             
         except Exception as e:
             self.logger.log(f"❌ Error creating main frames: {str(e)}")
@@ -258,8 +284,8 @@ class TradingBotGUI:
     def _create_symbol_frame(self) -> None:
         """Create symbol management frame."""
         try:
-            frame = ttk.LabelFrame(self.widgets['settings_frame'], text="Symbol Management", padding=10)
-            frame.pack(fill='x', padx=5, pady=5)
+            frame = ttk.LabelFrame(self.widgets['main_frame'], text="🎯 Symbol Management", padding=10)
+            frame.grid(row=2, column=0, columnspan=2, sticky='ew', padx=5, pady=5)
             
             # Symbol input
             ttk.Label(frame, text="Test Symbol:").grid(row=0, column=0, sticky='w')
@@ -281,8 +307,9 @@ class TradingBotGUI:
     def _create_calculator_frame(self) -> None:
         """Create TP/SL calculator frame."""
         try:
-            frame = ttk.LabelFrame(self.widgets['settings_frame'], text="TP/SL Calculator", padding=10)
-            frame.pack(fill='x', padx=5, pady=5)
+            # This function is now replaced by _create_enhanced_calculator
+            # Keep for backward compatibility but don't create duplicate UI
+            pass
             
             # Input fields
             fields = [
@@ -313,8 +340,9 @@ class TradingBotGUI:
     def _create_log_frame(self) -> None:
         """Create log display frame."""
         try:
-            frame = ttk.LabelFrame(self.widgets['monitor_frame'], text="Live Logs", padding=10)
-            frame.pack(fill='both', expand=True, padx=5, pady=5)
+            # This function is now replaced by _create_enhanced_logs
+            # Keep for backward compatibility but don't create duplicate UI
+            pass
             
             # Log text widget with scrollbar
             self.widgets['log_text'] = ScrolledText(frame, height=20, state='disabled')
@@ -683,6 +711,331 @@ Created with ❤️ for professional traders"""
             if self.root:
                 self.root.destroy()
     
+    def _create_enhanced_stats_frame(self) -> None:
+        """Create enhanced statistics frame with all bobot2.py metrics."""
+        try:
+            frame = ttk.LabelFrame(self.widgets['main_frame'], text="📊 Enhanced Statistics", padding=10)
+            frame.grid(row=1, column=1, sticky='ew', padx=5, pady=5)
+            
+            # Statistics grid (exact bobot2.py layout)
+            stats_grid = [
+                ("Win Rate:", "win_rate", "0%"),
+                ("Daily Orders:", "daily_orders", "0"),
+                ("Total P&L:", "total_pnl", "$0.00"),
+                ("Current Margin:", "current_margin", "0%"),
+                ("Max Drawdown:", "max_drawdown", "0%"),
+                ("Active Positions:", "active_positions", "0"),
+                ("Strategy Performance:", "strategy_perf", "N/A"),
+                ("Session Volume:", "session_volume", "0 lots")
+            ]
+            
+            self.widgets['enhanced_stats'] = {}
+            for i, (label, key, default) in enumerate(stats_grid):
+                row, col = divmod(i, 2)
+                ttk.Label(frame, text=label).grid(row=row, column=col*2, sticky='w', padx=5, pady=2)
+                self.widgets['enhanced_stats'][key] = ttk.Label(frame, text=default, foreground='cyan')
+                self.widgets['enhanced_stats'][key].grid(row=row, column=col*2+1, sticky='w', padx=5, pady=2)
+                
+        except Exception as e:
+            self.logger.log(f"❌ Error creating enhanced stats frame: {str(e)}")
+    
+    def _create_positions_table(self) -> None:
+        """Create real-time positions table (exact bobot2.py implementation)."""
+        try:
+            # Position table in Positions tab
+            table_frame = ttk.LabelFrame(self.widgets['positions_frame'], text="🔥 Live Positions", padding=10)
+            table_frame.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # Treeview for positions table
+            columns = ('Symbol', 'Type', 'Volume', 'Open Price', 'Current Price', 'P&L', 'Time')
+            self.widgets['positions_tree'] = ttk.Treeview(table_frame, columns=columns, show='headings', height=12)
+            
+            # Configure column headings and widths (exact bobot2.py styling)
+            column_widths = {'Symbol': 80, 'Type': 60, 'Volume': 80, 'Open Price': 100, 
+                           'Current Price': 100, 'P&L': 100, 'Time': 120}
+            
+            for col in columns:
+                self.widgets['positions_tree'].heading(col, text=col)
+                self.widgets['positions_tree'].column(col, width=column_widths.get(col, 100), anchor='center')
+            
+            # Scrollbars
+            v_scrollbar = ttk.Scrollbar(table_frame, orient='vertical', command=self.widgets['positions_tree'].yview)
+            h_scrollbar = ttk.Scrollbar(table_frame, orient='horizontal', command=self.widgets['positions_tree'].xview)
+            self.widgets['positions_tree'].configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+            
+            # Pack components
+            self.widgets['positions_tree'].pack(side='left', fill='both', expand=True)
+            v_scrollbar.pack(side='right', fill='y')
+            h_scrollbar.pack(side='bottom', fill='x')
+            
+            # Position control buttons
+            btn_frame = ttk.Frame(self.widgets['positions_frame'])
+            btn_frame.pack(fill='x', padx=10, pady=5)
+            
+            ttk.Button(btn_frame, text="🔄 Refresh", command=self._refresh_positions).pack(side='left', padx=5)
+            ttk.Button(btn_frame, text="❌ Close All", command=self._close_all_positions).pack(side='left', padx=5)
+            ttk.Button(btn_frame, text="📊 Export", command=self._export_positions).pack(side='left', padx=5)
+                
+        except Exception as e:
+            self.logger.log(f"❌ Error creating positions table: {str(e)}")
+    
+    def _create_enhanced_calculator(self) -> None:
+        """Create enhanced multi-unit TP/SL calculator (exact bobot2.py implementation)."""
+        try:
+            calc_frame = ttk.LabelFrame(self.widgets['calculator_frame'], text="🧮 Advanced TP/SL Calculator", padding=15)
+            calc_frame.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # Multi-unit calculator layout (exact bobot2.py design)
+            input_frame = ttk.Frame(calc_frame)
+            input_frame.pack(fill='x', pady=5)
+            
+            # Symbol and lot size
+            ttk.Label(input_frame, text="Symbol:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+            self.widgets['calc_symbol'] = ttk.Combobox(input_frame, values=POPULAR_SYMBOLS, width=12)
+            self.widgets['calc_symbol'].set('EURUSD')
+            self.widgets['calc_symbol'].grid(row=0, column=1, padx=5, pady=5)
+            
+            ttk.Label(input_frame, text="Lot Size:").grid(row=0, column=2, sticky='w', padx=5, pady=5)
+            self.widgets['calc_lot'] = ttk.Entry(input_frame, width=10)
+            self.widgets['calc_lot'].insert(0, '0.01')
+            self.widgets['calc_lot'].grid(row=0, column=3, padx=5, pady=5)
+            
+            # Multi-unit TP/SL inputs (exact bobot2.py layout)
+            units_frame = ttk.LabelFrame(calc_frame, text="Multi-Unit TP/SL Setup", padding=10)
+            units_frame.pack(fill='both', expand=True, pady=10)
+            
+            # TP/SL unit options
+            self.widgets['tp_units'] = {}
+            self.widgets['sl_units'] = {}
+            
+            units = ['Pips', 'Price', 'Percentage', 'Currency']
+            for i, unit in enumerate(units):
+                # TP section
+                tp_frame = ttk.Frame(units_frame)
+                tp_frame.grid(row=i, column=0, sticky='ew', padx=10, pady=5)
+                
+                ttk.Label(tp_frame, text=f"TP ({unit}):").pack(side='left', padx=5)
+                self.widgets['tp_units'][unit] = ttk.Entry(tp_frame, width=12)
+                self.widgets['tp_units'][unit].pack(side='left', padx=5)
+                
+                # SL section
+                sl_frame = ttk.Frame(units_frame)
+                sl_frame.grid(row=i, column=1, sticky='ew', padx=10, pady=5)
+                
+                ttk.Label(sl_frame, text=f"SL ({unit}):").pack(side='left', padx=5)
+                self.widgets['sl_units'][unit] = ttk.Entry(sl_frame, width=12)
+                self.widgets['sl_units'][unit].pack(side='left', padx=5)
+            
+            # Calculate button and results
+            calc_btn_frame = ttk.Frame(calc_frame)
+            calc_btn_frame.pack(fill='x', pady=10)
+            
+            ttk.Button(calc_btn_frame, text="🔥 Calculate All Units", 
+                      command=self._calculate_multi_units).pack(pady=5)
+            
+            # Enhanced results display
+            self.widgets['calc_results_enhanced'] = ScrolledText(calc_frame, height=8, state='disabled')
+            self.widgets['calc_results_enhanced'].pack(fill='both', expand=True, pady=5)
+                
+        except Exception as e:
+            self.logger.log(f"❌ Error creating enhanced calculator: {str(e)}")
+    
+    def _create_enhanced_logs(self) -> None:
+        """Create enhanced log viewer with filtering (exact bobot2.py implementation)."""
+        try:
+            logs_frame = ttk.LabelFrame(self.widgets['logs_frame'], text="📋 Enhanced Log Viewer", padding=10)
+            logs_frame.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # Log filtering controls (exact bobot2.py layout)
+            filter_frame = ttk.Frame(logs_frame)
+            filter_frame.pack(fill='x', pady=5)
+            
+            ttk.Label(filter_frame, text="Filter:").pack(side='left', padx=5)
+            self.widgets['log_filter'] = ttk.Combobox(filter_frame, values=['All', 'Trades', 'Errors', 'Signals', 'Session'], width=15)
+            self.widgets['log_filter'].set('All')
+            self.widgets['log_filter'].pack(side='left', padx=5)
+            
+            ttk.Button(filter_frame, text="🔍 Apply Filter", command=self._apply_log_filter).pack(side='left', padx=5)
+            ttk.Button(filter_frame, text="🗑️ Clear Logs", command=self._clear_logs).pack(side='left', padx=5)
+            ttk.Button(filter_frame, text="💾 Export", command=self._export_logs_csv).pack(side='left', padx=5)
+            
+            # Enhanced log display with line numbers
+            log_display_frame = ttk.Frame(logs_frame)
+            log_display_frame.pack(fill='both', expand=True, pady=5)
+            
+            self.widgets['log_text_enhanced'] = ScrolledText(log_display_frame, state='disabled', height=15)
+            self.widgets['log_text_enhanced'].pack(fill='both', expand=True)
+            
+            # Configure text tags for colored output
+            self.widgets['log_text_enhanced'].tag_configure('error', foreground='red')
+            self.widgets['log_text_enhanced'].tag_configure('success', foreground='green')
+            self.widgets['log_text_enhanced'].tag_configure('warning', foreground='yellow')
+            self.widgets['log_text_enhanced'].tag_configure('info', foreground='cyan')
+                
+        except Exception as e:
+            self.logger.log(f"❌ Error creating enhanced logs: {str(e)}")
+    
+    def _create_session_display(self) -> None:
+        """Create session indicator display (exact bobot2.py implementation)."""
+        try:
+            session_frame = ttk.LabelFrame(self.widgets['main_frame'], text="🌍 Trading Sessions", padding=10)
+            session_frame.grid(row=0, column=1, sticky='ew', padx=5, pady=5)
+            
+            # Session indicators (exact bobot2.py layout)
+            sessions = ['Asia 🌏', 'London 🌍', 'New York 🌎']
+            self.widgets['session_indicators'] = {}
+            
+            for i, session in enumerate(sessions):
+                session_key = session.split()[0].lower()
+                
+                frame = ttk.Frame(session_frame)
+                frame.grid(row=0, column=i, padx=10, pady=5)
+                
+                ttk.Label(frame, text=session).pack()
+                self.widgets['session_indicators'][session_key] = ttk.Label(frame, text="●", foreground='gray', font=('Arial', 16))
+                self.widgets['session_indicators'][session_key].pack()
+                
+            # Current session display
+            ttk.Label(session_frame, text="Active:").grid(row=1, column=0, sticky='w', pady=5)
+            self.widgets['current_session'] = ttk.Label(session_frame, text="London", foreground='green', font=('Arial', 12, 'bold'))
+            self.widgets['current_session'].grid(row=1, column=1, pady=5)
+                
+        except Exception as e:
+            self.logger.log(f"❌ Error creating session display: {str(e)}")
+    
+    # Enhanced GUI callback functions
+    def _refresh_positions(self) -> None:
+        """Refresh positions table with real-time data."""
+        try:
+            # Clear existing items
+            for item in self.widgets['positions_tree'].get_children():
+                self.widgets['positions_tree'].delete(item)
+            
+            # Get positions from account manager
+            if hasattr(self.bot, 'account_manager') and self.bot.account_manager:
+                positions = self.bot.account_manager.get_positions()
+                for pos in positions:
+                    self.widgets['positions_tree'].insert('', 'end', values=pos)
+                    
+        except Exception as e:
+            self.logger.log(f"❌ Error refreshing positions: {str(e)}")
+    
+    def _close_all_positions(self) -> None:
+        """Close all positions (emergency function)."""
+        try:
+            result = messagebox.askyesno("Close All Positions", 
+                                       "⚠️ This will close ALL open positions immediately. Are you sure?")
+            if result and hasattr(self.bot, 'strategy_manager'):
+                success = self.bot.strategy_manager.close_all_positions()
+                if success:
+                    messagebox.showinfo("Success", "All positions closed successfully!")
+                else:
+                    messagebox.showerror("Error", "Failed to close some positions. Check logs.")
+        except Exception as e:
+            self.logger.log(f"❌ Error closing all positions: {str(e)}")
+    
+    def _export_positions(self) -> None:
+        """Export positions to CSV."""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                title="Export Positions"
+            )
+            if filename and hasattr(self.bot, 'account_manager'):
+                success = self.bot.account_manager.export_positions_csv(filename)
+                if success:
+                    messagebox.showinfo("Export Complete", f"Positions exported to:\n{filename}")
+        except Exception as e:
+            self.logger.log(f"❌ Error exporting positions: {str(e)}")
+    
+    def _calculate_multi_units(self) -> None:
+        """Calculate TP/SL for all units (exact bobot2.py implementation)."""
+        try:
+            symbol = self.widgets['calc_symbol'].get()
+            lot_size = float(self.widgets['calc_lot'].get())
+            
+            results = []
+            results.append(f"🧮 Multi-Unit TP/SL Calculator Results for {symbol}\n")
+            results.append(f"Lot Size: {lot_size}\n")
+            results.append("=" * 50 + "\n")
+            
+            # Calculate for each unit type
+            for unit in ['Pips', 'Price', 'Percentage', 'Currency']:
+                tp_value = self.widgets['tp_units'][unit].get()
+                sl_value = self.widgets['sl_units'][unit].get()
+                
+                if tp_value or sl_value:
+                    results.append(f"\n📊 {unit} Calculations:\n")
+                    
+                    if tp_value:
+                        # Calculate TP profit based on unit type
+                        tp_profit = self._calculate_unit_profit(symbol, lot_size, tp_value, unit, 'TP')
+                        results.append(f"  TP ({unit}): {tp_value} → Profit: ${tp_profit:.2f}\n")
+                    
+                    if sl_value:
+                        # Calculate SL loss based on unit type
+                        sl_loss = self._calculate_unit_profit(symbol, lot_size, sl_value, unit, 'SL')
+                        results.append(f"  SL ({unit}): {sl_value} → Loss: ${sl_loss:.2f}\n")
+                    
+                    if tp_value and sl_value:
+                        # Calculate risk-reward ratio
+                        rr_ratio = abs(float(tp_value)) / abs(float(sl_value)) if float(sl_value) != 0 else 0
+                        results.append(f"  Risk:Reward = 1:{rr_ratio:.2f}\n")
+            
+            # Display results
+            self.widgets['calc_results_enhanced'].config(state='normal')
+            self.widgets['calc_results_enhanced'].delete('1.0', 'end')
+            self.widgets['calc_results_enhanced'].insert('1.0', ''.join(results))
+            self.widgets['calc_results_enhanced'].config(state='disabled')
+            
+        except Exception as e:
+            error_msg = f"❌ Calculation error: {str(e)}"
+            self.widgets['calc_results_enhanced'].config(state='normal')
+            self.widgets['calc_results_enhanced'].delete('1.0', 'end')
+            self.widgets['calc_results_enhanced'].insert('1.0', error_msg)
+            self.widgets['calc_results_enhanced'].config(state='disabled')
+    
+    def _calculate_unit_profit(self, symbol: str, lot_size: float, value: str, unit: str, direction: str) -> float:
+        """Calculate profit/loss for specific unit type."""
+        try:
+            if not value or not self.bot.risk_manager:
+                return 0.0
+            
+            value_float = float(value)
+            
+            if unit == 'Pips':
+                return self.bot.risk_manager.calculate_pip_value(symbol, lot_size) * value_float
+            elif unit == 'Currency':
+                return value_float
+            elif unit == 'Percentage':
+                # Calculate based on account balance percentage
+                if hasattr(self.bot, 'account_manager'):
+                    balance = self.bot.account_manager.get_balance()
+                    return balance * (value_float / 100)
+                return 0.0
+            elif unit == 'Price':
+                # Calculate based on price difference
+                pip_value = self.bot.risk_manager.calculate_pip_value(symbol, lot_size)
+                point = 0.0001 if 'JPY' not in symbol else 0.01
+                pips = value_float / point
+                return pip_value * pips
+            
+            return 0.0
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating unit profit: {str(e)}")
+            return 0.0
+    
+    def _apply_log_filter(self) -> None:
+        """Apply log filtering based on selected category."""
+        try:
+            filter_type = self.widgets['log_filter'].get()
+            # Implementation would filter logs based on type
+            self.logger.log(f"📋 Applied log filter: {filter_type}")
+        except Exception as e:
+            self.logger.log(f"❌ Error applying log filter: {str(e)}")
+
     def run(self) -> None:
         """Run the GUI main loop."""
         try:

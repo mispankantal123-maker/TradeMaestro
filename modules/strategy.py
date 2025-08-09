@@ -6,6 +6,7 @@ Implements multiple trading strategies and signal generation.
 from typing import Dict, Any, List, Optional, Tuple
 import time
 import threading
+import pandas as pd
 
 from config import *
 from .indicators import IndicatorCalculator
@@ -132,41 +133,68 @@ class StrategyManager:
     
     def _analyze_and_trade_symbol(self, symbol: str, current_session: Dict[str, Any]) -> None:
         """
-        Analyze symbol and execute trade if signal is found.
+        Analyze symbol and execute trades based on current strategy.
         
         Args:
-            symbol: Symbol to analyze
+            symbol: Trading symbol to analyze
             current_session: Current session information
         """
         try:
-            # Validate symbol
-            if not self.symbol_manager or not self.symbol_manager.validate_and_activate_symbol(symbol):
-                return
-            
-            # Rate limiting per symbol
+            # Check if we've traded this symbol recently
             current_time = time.time()
-            last_trade_time = self.last_signal_time.get(symbol, 0)
-            if current_time - last_trade_time < 60:  # 1 minute between signals
+            if symbol in self.last_signal_time:
+                time_since_last = current_time - self.last_signal_time[symbol]
+                min_interval = STRATEGY_INTERVALS.get(self.current_strategy, 60)
+                if time_since_last < min_interval:
+                    return
+            
+            # Get market data with sufficient history for analysis
+            data = self.indicator_calculator.get_symbol_data(symbol, count=200)
+            if data is None or len(data) < 50:
+                self.logger.log(f"❌ Insufficient data for {symbol}: {len(data) if data is not None else 0} bars")
                 return
             
-            # Get market data
-            market_data = self._get_market_data(symbol)
-            if not market_data:
-                return
+            # Calculate all indicators needed for strategies
+            data = self.indicator_calculator.calculate_all_indicators(data)
             
-            # Calculate indicators
-            indicators = None
-            if self.indicator_calculator:
-                indicators = self.indicator_calculator.calculate_all_indicators(symbol)
-            if not indicators:
-                return
+            # Run the complete strategy analysis from bobot2.py
+            action, signals = self._run_complete_strategy(self.current_strategy, data, symbol)
             
-            # Generate signal
-            signal = self._generate_signal(symbol, market_data, indicators, current_session)
-            if signal:
-                self._execute_trade_signal(signal, current_session)
-                self.last_signal_time[symbol] = current_time
+            if action and action in ['BUY', 'SELL']:
+                # Calculate TP/SL based on strategy
+                tp_pips = STRATEGY_DEFAULTS[self.current_strategy]['tp_pips']
+                sl_pips = STRATEGY_DEFAULTS[self.current_strategy]['sl_pips']
+                lot_size = STRATEGY_DEFAULTS[self.current_strategy]['lot_size']
                 
+                # Get current price for TP/SL calculation
+                current_price = data['close'].iloc[-1]
+                
+                # Calculate TP/SL prices
+                if action == 'BUY':
+                    tp_price = current_price + (tp_pips * 0.0001)  # Assuming 4-digit precision
+                    sl_price = current_price - (sl_pips * 0.0001)
+                else:
+                    tp_price = current_price - (tp_pips * 0.0001)
+                    sl_price = current_price + (sl_pips * 0.0001)
+                
+                # Execute trade
+                result = self.order_manager.place_order(
+                    symbol=symbol,
+                    action=action,
+                    volume=lot_size,
+                    tp_price=tp_price,
+                    sl_price=sl_price,
+                    comment=f"{self.current_strategy}_Signal"
+                )
+                
+                if result:
+                    self.last_signal_time[symbol] = current_time
+                    self.logger.log(f"✅ {self.current_strategy} trade executed: {action} {symbol}")
+                    for signal in signals:
+                        self.logger.log(f"   📊 {signal}")
+                else:
+                    self.logger.log(f"❌ Trade execution failed for {symbol}")
+        
         except Exception as e:
             self.logger.log(f"❌ Error analyzing symbol {symbol}: {str(e)}")
     
@@ -205,293 +233,308 @@ class StrategyManager:
             self.logger.log(f"❌ Error getting market data for {symbol}: {str(e)}")
             return None
     
-    def _generate_signal(self, symbol: str, market_data: Dict[str, Any], 
-                        indicators: Dict[str, Any], current_session: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Generate trading signal based on strategy and indicators.
-        
-        Args:
-            symbol: Symbol name
-            market_data: Current market data
-            indicators: Technical indicators
-            current_session: Current session info
-            
-        Returns:
-            Signal dictionary or None
-        """
+    def _run_complete_strategy(self, strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional[str], List[str]]:
+        """Complete strategy analysis based on bobot2.py implementation"""
         try:
-            strategy_name = self.current_strategy
-            signal_strength = 0
-            signal_type = None
+            if len(df) < 50:
+                self.logger.log(f"❌ Insufficient data for {symbol}: {len(df)} bars (need 50+)")
+                return None, []
             
-            if strategy_name == "HFT":
-                signal = self._hft_strategy(symbol, market_data, indicators)
-            elif strategy_name == "Scalping":
-                signal = self._scalping_strategy(symbol, market_data, indicators)
-            elif strategy_name == "Intraday":
-                signal = self._intraday_strategy(symbol, market_data, indicators)
-            elif strategy_name == "Arbitrage":
-                signal = self._arbitrage_strategy(symbol, market_data, indicators)
-            else:
-                return None
+            # Get precision info
+            digits = 5  # Default for most forex pairs
+            point = 0.00001  # Default point value
             
-            if signal and signal.get('strength', 0) > 0.6:  # Minimum signal strength
-                return {
-                    "symbol": symbol,
-                    "action": signal['action'],
-                    "strength": signal['strength'],
-                    "strategy": strategy_name,
-                    "indicators": indicators,
-                    "market_data": market_data
-                }
+            # Use most recent candle data
+            last = df.iloc[-1]
+            prev = df.iloc[-2]
+            prev2 = df.iloc[-3] if len(df) > 3 else prev
             
-            return None
+            # Get current prices
+            current_price = last['close']
+            last_close = last['close']
+            last_high = last['high']
+            last_low = last['low']
+            last_open = last['open']
             
-        except Exception as e:
-            self.logger.log(f"❌ Error generating signal for {symbol}: {str(e)}")
-            return None
-    
-    def _hft_strategy(self, symbol: str, market_data: Dict[str, Any], 
-                     indicators: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """High-Frequency Trading strategy implementation."""
-        try:
-            ema_fast = indicators.get('EMA_12')
-            ema_slow = indicators.get('EMA_26')
-            rsi = indicators.get('RSI')
-            
-            if not all([ema_fast, ema_slow, rsi]):
-                return None
-            
-            signal_strength = 0
             action = None
+            signals = []
+            buy_signals = 0
+            sell_signals = 0
             
-            # EMA crossover signal
-            if ema_fast and ema_slow and len(ema_fast) >= 2 and len(ema_slow) >= 2:
-                if ema_fast[-1] > ema_slow[-1] and ema_fast[-2] <= ema_slow[-2]:
-                    # Golden cross
-                    signal_strength += 0.4
-                    action = "BUY"
-                elif ema_fast[-1] < ema_slow[-1] and ema_fast[-2] >= ema_slow[-2]:
-                    # Death cross
-                    signal_strength += 0.4
-                    action = "SELL"
+            # Enhanced price logging
+            self.logger.log(f"📊 {symbol} Data: O={last_open:.5f} H={last_high:.5f} L={last_low:.5f} C={last_close:.5f}")
             
-            # RSI confirmation
-            if rsi and len(rsi) >= 1:
-                current_rsi = rsi[-1]
-                if action == "BUY" and current_rsi < 70:
-                    signal_strength += 0.3
-                elif action == "SELL" and current_rsi > 30:
-                    signal_strength += 0.3
-            
-            # Spread filter for HFT
-            spread_pips = market_data['spread'] / market_data['point']
-            if spread_pips > 2:  # Too wide for HFT
-                signal_strength *= 0.5
-            
-            return {"action": action, "strength": signal_strength} if action else None
-            
-        except Exception as e:
-            self.logger.log(f"❌ Error in HFT strategy: {str(e)}")
-            return None
-    
-    def _scalping_strategy(self, symbol: str, market_data: Dict[str, Any], 
-                          indicators: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Scalping strategy implementation."""
-        try:
-            ema_fast = indicators.get('EMA_12')
-            ema_slow = indicators.get('EMA_26')
-            rsi = indicators.get('RSI')
-            macd = indicators.get('MACD')
-            
-            if not all([ema_fast, ema_slow, rsi]):
-                return None
-            
-            signal_strength = 0
-            action = None
-            
-            # Multiple timeframe analysis
-            if ema_fast and ema_slow and len(ema_fast) >= 3 and len(ema_slow) >= 3:
-                # Trend direction
-                if ema_fast[-1] > ema_slow[-1]:
-                    if market_data['bid'] > ema_fast[-1]:
-                        action = "BUY"
-                        signal_strength += 0.3
-                elif ema_fast[-1] < ema_slow[-1]:
-                    if market_data['ask'] < ema_fast[-1]:
-                        action = "SELL"
-                        signal_strength += 0.3
-            
-            # RSI momentum
-            if rsi and len(rsi) >= 2:
-                if action == "BUY" and rsi[-1] > rsi[-2] and rsi[-1] < 65:
-                    signal_strength += 0.3
-                elif action == "SELL" and rsi[-1] < rsi[-2] and rsi[-1] > 35:
-                    signal_strength += 0.3
-            
-            # MACD confirmation
-            if macd and len(macd.get('histogram', [])) >= 2:
-                histogram = macd['histogram']
-                if action == "BUY" and histogram[-1] > histogram[-2]:
-                    signal_strength += 0.2
-                elif action == "SELL" and histogram[-1] < histogram[-2]:
-                    signal_strength += 0.2
-            
-            return {"action": action, "strength": signal_strength} if action else None
-            
-        except Exception as e:
-            self.logger.log(f"❌ Error in scalping strategy: {str(e)}")
-            return None
-    
-    def _intraday_strategy(self, symbol: str, market_data: Dict[str, Any], 
-                          indicators: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Intraday trading strategy implementation."""
-        try:
-            ema_fast = indicators.get('EMA_12')
-            ema_slow = indicators.get('EMA_26')
-            rsi = indicators.get('RSI')
-            atr = indicators.get('ATR')
-            bollinger = indicators.get('Bollinger')
-            
-            signal_strength = 0
-            action = None
-            
-            # Trend-following with volatility filter
-            if all([ema_fast, ema_slow, atr]) and ema_fast and len(ema_fast) >= 5 and ema_slow and len(ema_slow) >= 5:
-                # Strong trend detection
-                trend_strength = 0
-                for i in range(1, 5):
-                    if ema_fast[-i] > ema_slow[-i]:
-                        trend_strength += 1
+            if strategy == "Scalping":
+                # Enhanced Scalping strategy from bobot2.py
+                self.logger.log("⚡ Scalping: Multi-confirmation EMA system...")
+                
+                # Get EMA values
+                ema5_current = last.get('EMA5', current_price)
+                ema8_current = last.get('EMA8', current_price)
+                ema13_current = last.get('EMA13', current_price)
+                ema50_current = last.get('EMA50', current_price)
+                
+                ema5_prev = prev.get('EMA5', current_price)
+                ema8_prev = prev.get('EMA8', current_price)
+                ema13_prev = prev.get('EMA13', current_price)
+                
+                self.logger.log(f"🔍 Scalping EMAs: 5={ema5_current:.5f}, 8={ema8_current:.5f}, 13={ema13_current:.5f}")
+                
+                # EMA crossover detection
+                min_cross_threshold = point * 2
+                ema5_cross_up = (ema5_current > ema13_current and ema5_prev <= ema13_prev and
+                               abs(ema5_current - ema13_current) >= min_cross_threshold)
+                ema5_cross_down = (ema5_current < ema13_current and ema5_prev >= ema13_prev and
+                                 abs(ema5_current - ema13_current) >= min_cross_threshold)
+                
+                # Trend confirmation
+                trend_bullish = (ema5_current > ema13_current > ema50_current and current_price > ema50_current)
+                trend_bearish = (ema5_current < ema13_current < ema50_current and current_price < ema50_current)
+                
+                # Price action confirmation
+                candle_body = abs(last_close - last_open)
+                candle_range = last_high - last_low
+                candle_body_ratio = candle_body / max(candle_range, point) if candle_range > 0 else 0
+                
+                bullish_candle = last_close > last_open and candle_body_ratio > 0.3
+                bearish_candle = last_close < last_open and candle_body_ratio > 0.3
+                
+                # RSI analysis
+                rsi_value = last.get('RSI', 50)
+                rsi_bullish = 35 < rsi_value < 75
+                rsi_bearish = 25 < rsi_value < 65
+                
+                # BUY SIGNALS
+                if ema5_cross_up:
+                    if trend_bullish and bullish_candle:
+                        if rsi_value < 30 and rsi_value > prev.get('RSI', 50):
+                            buy_signals += 8
+                            signals.append(f"✅ SCALP STRONG: EMA cross UP + RSI recovery @ {current_price:.5f}")
+                        elif rsi_bullish and current_price > ema50_current:
+                            buy_signals += 6
+                            signals.append(f"✅ SCALP: EMA cross UP + trend @ {current_price:.5f}")
                     else:
-                        trend_strength -= 1
+                        buy_signals += 4
+                        signals.append(f"✅ SCALP: EMA cross UP + basic conditions @ {current_price:.5f}")
                 
-                if trend_strength >= 3:
-                    action = "BUY"
-                    signal_strength += 0.4
-                elif trend_strength <= -3:
-                    action = "SELL"
-                    signal_strength += 0.4
+                # Price above EMA5 continuation
+                elif (current_price > ema5_current and ema5_current > ema13_current and
+                      current_price > last_high * 0.999):
+                    if (rsi_value > 50 and last.get('MACD_histogram', 0) > prev.get('MACD_histogram', 0)):
+                        buy_signals += 5
+                        signals.append(f"✅ SCALP: Uptrend continuation @ {current_price:.5f}")
+                    elif current_price > ema50_current:
+                        buy_signals += 3
+                        signals.append(f"✅ SCALP: Basic uptrend @ {current_price:.5f}")
+                
+                # SELL SIGNALS
+                if ema5_cross_down:
+                    if trend_bearish and bearish_candle:
+                        if rsi_value > 70 and rsi_value < prev.get('RSI', 50):
+                            sell_signals += 8
+                            signals.append(f"✅ SCALP STRONG: EMA cross DOWN + RSI decline @ {current_price:.5f}")
+                        elif rsi_bearish and current_price < ema50_current:
+                            sell_signals += 6
+                            signals.append(f"✅ SCALP: EMA cross DOWN + trend @ {current_price:.5f}")
+                    else:
+                        sell_signals += 4
+                        signals.append(f"✅ SCALP: EMA cross DOWN + basic conditions @ {current_price:.5f}")
+                
+                # Price below EMA5 continuation
+                elif (current_price < ema5_current and ema5_current < ema13_current and
+                      current_price < last_low * 1.001):
+                    if (rsi_value < 50 and last.get('MACD_histogram', 0) < prev.get('MACD_histogram', 0)):
+                        sell_signals += 5
+                        signals.append(f"✅ SCALP: Downtrend continuation @ {current_price:.5f}")
+                    elif current_price < ema50_current:
+                        sell_signals += 3
+                        signals.append(f"✅ SCALP: Basic downtrend @ {current_price:.5f}")
+                
+                # RSI Extreme Levels
+                if rsi_value < 25:
+                    buy_signals += 2
+                    signals.append(f"✅ SCALP: RSI oversold ({rsi_value:.1f})")
+                elif rsi_value > 75:
+                    sell_signals += 2
+                    signals.append(f"✅ SCALP: RSI overbought ({rsi_value:.1f})")
+                
+                # MACD momentum
+                if (last.get('MACD_histogram', 0) > 0 and
+                        last.get('MACD_histogram', 0) > prev.get('MACD_histogram', 0)):
+                    buy_signals += 2
+                    signals.append("✅ SCALP: MACD momentum bullish")
+                elif (last.get('MACD_histogram', 0) < 0 and
+                      last.get('MACD_histogram', 0) < prev.get('MACD_histogram', 0)):
+                    sell_signals += 2
+                    signals.append("✅ SCALP: MACD momentum bearish")
             
-            # RSI divergence
-            if rsi and len(rsi) >= 5:
-                if action == "BUY" and rsi[-1] < 60:
-                    signal_strength += 0.2
-                elif action == "SELL" and rsi[-1] > 40:
-                    signal_strength += 0.2
+            elif strategy == "HFT":
+                # High-Frequency Trading strategy
+                self.logger.log("⚡ HFT: Tick-based precision trading...")
+                
+                # Enhanced HFT logic from bobot2.py
+                ema5 = last.get('EMA5', current_price)
+                ema8 = last.get('EMA8', current_price)
+                rsi = last.get('RSI', 50)
+                
+                # Tick momentum
+                price_change = current_price - prev['close']
+                momentum = price_change / point if point > 0 else 0
+                
+                # HFT signals based on micro-movements
+                if momentum > 5 and ema5 > ema8 and rsi < 70:
+                    buy_signals += 6
+                    signals.append(f"✅ HFT: Strong upward momentum ({momentum:.1f} points)")
+                elif momentum < -5 and ema5 < ema8 and rsi > 30:
+                    sell_signals += 6
+                    signals.append(f"✅ HFT: Strong downward momentum ({momentum:.1f} points)")
+                elif momentum > 3 and ema5 > ema8:
+                    buy_signals += 4
+                    signals.append(f"✅ HFT: Moderate upward momentum ({momentum:.1f} points)")
+                elif momentum < -3 and ema5 < ema8:
+                    sell_signals += 4
+                    signals.append(f"✅ HFT: Moderate downward momentum ({momentum:.1f} points)")
             
-            # Bollinger Band position
-            if bollinger and len(bollinger['middle']) >= 1:
-                current_price = (market_data['bid'] + market_data['ask']) / 2
-                if action == "BUY" and current_price < bollinger['lower'][-1]:
-                    signal_strength += 0.3
-                elif action == "SELL" and current_price > bollinger['upper'][-1]:
-                    signal_strength += 0.3
+            elif strategy == "Intraday":
+                # Intraday strategy with MACD and trend analysis
+                self.logger.log("📈 Intraday: MACD + trend analysis...")
+                
+                macd = last.get('MACD', 0)
+                macd_signal = last.get('MACD_signal', 0)
+                macd_hist = last.get('MACD_histogram', 0)
+                ema20 = last.get('EMA20', current_price)
+                ema50 = last.get('EMA50', current_price)
+                rsi = last.get('RSI', 50)
+                
+                # MACD crossover
+                macd_prev = prev.get('MACD', 0)
+                macd_signal_prev = prev.get('MACD_signal', 0)
+                
+                macd_bullish_cross = macd > macd_signal and macd_prev <= macd_signal_prev
+                macd_bearish_cross = macd < macd_signal and macd_prev >= macd_signal_prev
+                
+                # Trend confirmation
+                strong_uptrend = ema20 > ema50 and current_price > ema20
+                strong_downtrend = ema20 < ema50 and current_price < ema20
+                
+                # Intraday signals
+                if macd_bullish_cross and strong_uptrend and 30 < rsi < 70:
+                    buy_signals += 7
+                    signals.append("✅ INTRADAY: MACD bullish cross + uptrend")
+                elif macd_bearish_cross and strong_downtrend and 30 < rsi < 70:
+                    sell_signals += 7
+                    signals.append("✅ INTRADAY: MACD bearish cross + downtrend")
+                elif macd_hist > 0 and macd_hist > prev.get('MACD_histogram', 0) and strong_uptrend:
+                    buy_signals += 5
+                    signals.append("✅ INTRADAY: MACD momentum + uptrend")
+                elif macd_hist < 0 and macd_hist < prev.get('MACD_histogram', 0) and strong_downtrend:
+                    sell_signals += 5
+                    signals.append("✅ INTRADAY: MACD momentum + downtrend")
             
-            return {"action": action, "strength": signal_strength} if action else None
+            elif strategy == "Arbitrage":
+                # Arbitrage strategy with mean reversion
+                self.logger.log("🔄 Arbitrage: Mean reversion analysis...")
+                
+                # Bollinger Bands for mean reversion
+                bb_upper = last.get('BB_upper', current_price * 1.001)
+                bb_lower = last.get('BB_lower', current_price * 0.999)
+                bb_middle = last.get('BB_middle', current_price)
+                rsi = last.get('RSI', 50)
+                
+                # Mean reversion signals
+                if current_price <= bb_lower and rsi < 30:
+                    buy_signals += 6
+                    signals.append("✅ ARBITRAGE: Price at lower BB + oversold")
+                elif current_price >= bb_upper and rsi > 70:
+                    sell_signals += 6
+                    signals.append("✅ ARBITRAGE: Price at upper BB + overbought")
+                elif current_price < bb_middle and rsi < 40:
+                    buy_signals += 4
+                    signals.append("✅ ARBITRAGE: Below middle BB + oversold")
+                elif current_price > bb_middle and rsi > 60:
+                    sell_signals += 4
+                    signals.append("✅ ARBITRAGE: Above middle BB + overbought")
             
-        except Exception as e:
-            self.logger.log(f"❌ Error in intraday strategy: {str(e)}")
-            return None
-    
-    def _arbitrage_strategy(self, symbol: str, market_data: Dict[str, Any], 
-                           indicators: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Arbitrage strategy implementation."""
-        try:
-            # Simple spread arbitrage
-            spread_pips = market_data['spread'] / market_data['point']
+            # Signal threshold based on strategy
+            thresholds = {"Scalping": 5, "HFT": 4, "Intraday": 5, "Arbitrage": 4}
+            threshold = thresholds.get(strategy, 5)
             
-            # Look for unusually wide spreads to fade
-            if spread_pips > 5:  # Unusual spread
-                # Simple mean reversion signal
-                return {"action": "BUY", "strength": 0.7}  # Simplified for demo
-            
-            return None
-            
-        except Exception as e:
-            self.logger.log(f"❌ Error in arbitrage strategy: {str(e)}")
-            return None
-    
-    def _execute_trade_signal(self, signal: Dict[str, Any], current_session: Dict[str, Any]) -> None:
-        """
-        Execute trade signal by opening position.
-        
-        Args:
-            signal: Trading signal
-            current_session: Current session information
-        """
-        try:
-            symbol = signal['symbol']
-            action = signal['action']
-            strategy_name = signal['strategy']
-            
-            # Get strategy defaults
-            strategy_config = STRATEGY_DEFAULTS.get(strategy_name, STRATEGY_DEFAULTS['Scalping'])
-            
-            # Apply session adjustments
-            session_settings = SESSION_SETTINGS.get(current_session.get('name', 'London'), 
-                                                   SESSION_SETTINGS['London'])
-            
-            # Calculate position parameters
-            lot_size = strategy_config['lot_size'] * session_settings.get('lot_multiplier', 1.0)
-            tp_pips = strategy_config['tp_pips'] * session_settings.get('tp_multiplier', 1.0)
-            sl_pips = strategy_config['sl_pips'] * session_settings.get('sl_multiplier', 1.0)
-            
-            # Validate position size
-            if not self.risk_manager or not self.risk_manager.validate_position_size(symbol, lot_size):
-                self.logger.log(f"❌ Invalid position size for {symbol}")
-                return
-            
-            # Execute order
-            self.logger.log(f"📈 Executing {action} signal for {symbol} (Strategy: {strategy_name})")
-            
-            result = None
-            if self.order_manager:
-                result = self.order_manager.open_order(
-                    symbol=symbol,
-                    lot_size=lot_size,
-                    action=action,
-                    sl_input=str(sl_pips),
-                    tp_input=str(tp_pips),
-                    sl_unit='pips',
-                    tp_unit='pips'
-                )
-            
-            if result:
-                self.logger.log(f"✅ Order executed successfully for {symbol}")
+            # Determine final action
+            if buy_signals >= threshold and buy_signals > sell_signals:
+                action = "BUY"
+                self.logger.log(f"🟢 {strategy} BUY signal: {buy_signals} points")
+            elif sell_signals >= threshold and sell_signals > buy_signals:
+                action = "SELL"
+                self.logger.log(f"🔴 {strategy} SELL signal: {sell_signals} points")
             else:
-                self.logger.log(f"❌ Failed to execute order for {symbol}")
-                
+                self.logger.log(f"⚪ {strategy} No signal: BUY={buy_signals}, SELL={sell_signals}")
+            
+            return action, signals
+            
         except Exception as e:
-            self.logger.log(f"❌ Error executing trade signal: {str(e)}")
+            self.logger.log(f"❌ Error in strategy analysis: {str(e)}")
+            return None, []
     
     def set_strategy(self, strategy_name: str) -> bool:
         """
-        Set current trading strategy.
+        Set the current trading strategy.
         
         Args:
-            strategy_name: Name of strategy to use
+            strategy_name: Name of the strategy to set
             
         Returns:
-            bool: True if strategy set successfully
+            bool: True if strategy was set successfully
         """
         try:
             if strategy_name in STRATEGY_DEFAULTS:
-                with self.strategy_lock:
-                    self.current_strategy = strategy_name
-                    self.logger.log(f"📊 Strategy changed to: {strategy_name}")
-                    return True
+                self.current_strategy = strategy_name
+                self.logger.log(f"✅ Strategy changed to: {strategy_name}")
+                return True
             else:
                 self.logger.log(f"❌ Unknown strategy: {strategy_name}")
                 return False
-                
         except Exception as e:
             self.logger.log(f"❌ Error setting strategy: {str(e)}")
             return False
     
     def get_current_strategy(self) -> str:
-        """Get current strategy name."""
+        """Get the current trading strategy."""
         return self.current_strategy
+    
+    def get_available_strategies(self) -> List[str]:
+        """Get list of available strategies."""
+        return list(STRATEGY_DEFAULTS.keys())
+    
+    def close_all_positions(self) -> bool:
+        """
+        Close all open positions (emergency function).
+        
+        Returns:
+            bool: True if all positions closed successfully
+        """
+        try:
+            if not self.order_manager:
+                self.logger.log("❌ Order manager not available")
+                return False
+            
+            self.logger.log("🚨 EMERGENCY: Closing all positions...")
+            
+            # Get all open positions
+            if hasattr(self.order_manager, 'close_all_positions'):
+                result = self.order_manager.close_all_positions()
+                if result:
+                    self.logger.log("✅ All positions closed successfully")
+                    return True
+                else:
+                    self.logger.log("❌ Failed to close some positions")
+                    return False
+            else:
+                self.logger.log("❌ Close all positions function not available")
+                return False
+                
+        except Exception as e:
+            self.logger.log(f"❌ Error closing all positions: {str(e)}")
+            return False
     
     def close_all_positions(self) -> bool:
         """

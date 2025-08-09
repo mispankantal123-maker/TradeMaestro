@@ -110,7 +110,7 @@ class IndicatorCalculator:
             rs = gain / loss
             rsi = 100 - (100 / (1 + rs))
             
-            return rsi
+            return rsi.fillna(50)
             
         except Exception as e:
             self.logger.log(f"❌ Error calculating RSI: {str(e)}")
@@ -176,7 +176,7 @@ class IndicatorCalculator:
             self.logger.log(f"❌ Error calculating Bollinger Bands: {str(e)}")
             return {}
     
-    def calculate_atr(self, high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
+    def calculate_atr(self, data: pd.DataFrame, period: int = 14) -> pd.Series:
         """
         Calculate Average True Range.
         
@@ -190,6 +190,10 @@ class IndicatorCalculator:
             ATR series
         """
         try:
+            high = data['high']
+            low = data['low']
+            close = data['close']
+            
             prev_close = close.shift(1)
             
             tr1 = high - low
@@ -199,7 +203,7 @@ class IndicatorCalculator:
             true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
             atr = true_range.rolling(window=period).mean()
             
-            return atr
+            return atr.fillna(0.0008)
             
         except Exception as e:
             self.logger.log(f"❌ Error calculating ATR: {str(e)}")
@@ -278,9 +282,141 @@ class IndicatorCalculator:
             self.logger.log(f"❌ Error calculating Momentum: {str(e)}")
             return pd.Series()
     
-    def calculate_all_indicators(self, symbol: str, timeframe: int = None) -> Dict[str, Any]:
+    def calculate_all_indicators(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Calculate all technical indicators for a symbol.
+        Calculate all indicators and add them to the DataFrame (bobot2.py compatible).
+        
+        Args:
+            data: DataFrame with OHLCV data
+            
+        Returns:
+            DataFrame with all indicators added
+        """
+        try:
+            if data is None or len(data) < 50:
+                return data
+            
+            # EMAs - Multiple periods for different strategies (exact bobot2.py match)
+            data['EMA5'] = self.calculate_ema(data['close'], 5)
+            data['EMA8'] = self.calculate_ema(data['close'], 8)
+            data['EMA13'] = self.calculate_ema(data['close'], 13)
+            data['EMA20'] = self.calculate_ema(data['close'], 20)
+            data['EMA50'] = self.calculate_ema(data['close'], 50)
+            data['EMA100'] = self.calculate_ema(data['close'], 100)
+            data['EMA200'] = self.calculate_ema(data['close'], 200)
+            
+            # WMA (Weighted Moving Average)
+            data['WMA10'] = self.calculate_wma(data['close'], 10)
+            data['WMA20'] = self.calculate_wma(data['close'], 20)
+            
+            # RSI - Multiple periods (exact bobot2.py match)
+            data['RSI'] = self.calculate_rsi(data['close'], 14)
+            data['RSI7'] = self.calculate_rsi(data['close'], 7)
+            data['RSI21'] = self.calculate_rsi(data['close'], 21)
+            
+            # MACD (exact bobot2.py match)
+            macd_data = self.calculate_macd(data['close'])
+            data['MACD'] = macd_data['macd']
+            data['MACD_signal'] = macd_data['signal']
+            data['MACD_histogram'] = macd_data['histogram']
+            
+            # Bollinger Bands (exact bobot2.py match)
+            bb_data = self.calculate_bollinger_bands(data['close'])
+            data['BB_upper'] = bb_data['upper']
+            data['BB_middle'] = bb_data['middle']
+            data['BB_lower'] = bb_data['lower']
+            
+            # ATR (Average True Range) - exact bobot2.py match
+            data['ATR'] = self.calculate_atr(data)
+            data['ATR_Ratio'] = data['ATR'] / data['close']
+            
+            # Stochastic Oscillator (exact bobot2.py match)
+            stoch_data = self.calculate_stochastic_df(data)
+            data['Stoch_K'] = stoch_data['%K']
+            data['Stoch_D'] = stoch_data['%D']
+            
+            # Enhanced indicators for strategies (exact bobot2.py match)
+            data['EMA_Momentum'] = self.calculate_ema_momentum(data)
+            data['EMA5_Slope'] = self.calculate_slope(data['EMA5'])
+            data['EMA13_Slope'] = self.calculate_slope(data['EMA13'])
+            
+            # Price action patterns (exact bobot2.py match)
+            data['Strong_Bullish_Candle'] = self.detect_strong_bullish_candle(data)
+            data['Strong_Bearish_Candle'] = self.detect_strong_bearish_candle(data)
+            
+            return data
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating indicators: {str(e)}")
+            return data
+
+    def calculate_wma(self, data: pd.Series, period: int) -> pd.Series:
+        """Calculate Weighted Moving Average."""
+        try:
+            weights = np.arange(1, period + 1)
+            return data.rolling(window=period).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating WMA: {str(e)}")
+            return pd.Series()
+    
+    def calculate_stochastic_df(self, data: pd.DataFrame, k_period: int = 14, d_period: int = 3) -> Dict[str, pd.Series]:
+        """Calculate Stochastic Oscillator for DataFrame."""
+        try:
+            low_min = data['low'].rolling(window=k_period).min()
+            high_max = data['high'].rolling(window=k_period).max()
+            
+            k_percent = 100 * ((data['close'] - low_min) / (high_max - low_min))
+            d_percent = k_percent.rolling(window=d_period).mean()
+            
+            return {'%K': k_percent.fillna(50), '%D': d_percent.fillna(50)}
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating Stochastic: {str(e)}")
+            return {'%K': pd.Series(), '%D': pd.Series()}
+    
+    def calculate_ema_momentum(self, data: pd.DataFrame) -> pd.Series:
+        """Calculate EMA momentum indicator."""
+        try:
+            if 'EMA5' in data and 'EMA13' in data:
+                return (data['EMA5'] - data['EMA13']) / data['EMA13']
+            return pd.Series([0] * len(data))
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating EMA momentum: {str(e)}")
+            return pd.Series()
+    
+    def calculate_slope(self, data: pd.Series, period: int = 3) -> pd.Series:
+        """Calculate slope of a series."""
+        try:
+            return data.diff(period) / period
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating slope: {str(e)}")
+            return pd.Series()
+    
+    def detect_strong_bullish_candle(self, data: pd.DataFrame) -> pd.Series:
+        """Detect strong bullish candles."""
+        try:
+            body = data['close'] - data['open']
+            range_val = data['high'] - data['low']
+            body_ratio = body / range_val.replace(0, 0.0001)
+            
+            return (body > 0) & (body_ratio > 0.6) & (data['close'] > data['open'])
+        except Exception as e:
+            self.logger.log(f"❌ Error detecting bullish candles: {str(e)}")
+            return pd.Series([False] * len(data))
+    
+    def detect_strong_bearish_candle(self, data: pd.DataFrame) -> pd.Series:
+        """Detect strong bearish candles."""
+        try:
+            body = data['open'] - data['close']
+            range_val = data['high'] - data['low']
+            body_ratio = body / range_val.replace(0, 0.0001)
+            
+            return (body > 0) & (body_ratio > 0.6) & (data['close'] < data['open'])
+        except Exception as e:
+            self.logger.log(f"❌ Error detecting bearish candles: {str(e)}")
+            return pd.Series([False] * len(data))
+            
+    def calculate_legacy_indicators(self, symbol: str, timeframe: int = None) -> Dict[str, Any]:
+        """Legacy function for backward compatibility.
         
         Args:
             symbol: Trading symbol
@@ -339,6 +475,33 @@ class IndicatorCalculator:
                 }
             
             # ATR
+            indicators['ATR'] = self.calculate_atr(df, INDICATOR_PERIODS['ATR']).tolist()
+            
+            # Stochastic
+            stoch_result = self.calculate_stochastic(high, low, close, 
+                                                   INDICATOR_PERIODS['Stoch_K'],
+                                                   INDICATOR_PERIODS['Stoch_D'])
+            if stoch_result:
+                indicators['Stochastic'] = {
+                    'K': stoch_result['%K'].tolist(),
+                    'D': stoch_result['%D'].tolist()
+                }
+            
+            # Williams %R
+            indicators['WilliamsR'] = self.calculate_williams_r(high, low, close, 
+                                                             INDICATOR_PERIODS['Williams']).tolist()
+            
+            # Momentum
+            indicators['Momentum'] = self.calculate_momentum(close, INDICATOR_PERIODS['Momentum']).tolist()
+            
+            # Cache result
+            self.indicator_cache[cache_key] = indicators
+            
+            return indicators
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error calculating legacy indicators for {symbol}: {str(e)}")
+            return {}
             indicators['ATR'] = self.calculate_atr(high, low, close, INDICATOR_PERIODS['ATR']).tolist()
             
             # Stochastic

@@ -1,0 +1,84 @@
+# AUDIT & PEMBENAHAN BOT MT5 - REPLIT
+Tugas:
+1. Audit ulang secara total bot MT5 ini terhadap bobot2.py asli.
+2. Samakan sistem, strategi, dan GUI hingga 100% identik secara fungsi, tampilan, dan alur kerja.
+3. Tingkatkan kinerja, perbaiki bug, dan optimalkan semua proses.
+4. Pastikan bot siap live trading dengan MT5 real tanpa error.
+
+## Langkah Audit
+
+### 1. Audit Sistem (Backend)
+- Periksa semua modul: connection, symbols, account, risk, strategy, orders, sessions, logging, indicators, news filter, utils.
+- Bandingkan setiap fungsi dengan bobot2.py:
+  - Apakah nama fungsi, logika, dan parameternya sama?
+  - Apakah strategi trading (HFT, Scalping, Intraday, Arbitrage) sudah lengkap dan identik?
+  - Apakah semua indikator (EMA, RSI, MACD, BB, Stochastic, ATR, WMA) sudah ada dan digunakan sesuai strategi?
+  - Apakah news filter berfungsi sesuai desain awal (time-based + API)?
+  - Apakah risk management (TP/SL multi-unit, auto-lot, drawdown, max positions) sudah lengkap?
+
+- Lakukan **perbaikan langsung** jika:
+  - Ada perbedaan logika atau parameter.
+  - Fungsi belum 100% sama.
+  - Ada error handling yang belum lengkap.
+
+### 2. Audit GUI (Frontend - Tkinter)
+- Bandingkan tampilan GUI dengan bobot2.py:
+  - Layout panel utama, panel statistik, panel kontrol, tabel posisi, log viewer, kalkulator TP/SL.
+  - Warna, font, ukuran teks, posisi tombol.
+  - Semua tombol harus memicu fungsi backend yang benar.
+- Pastikan semua fitur GUI ada:
+  - Start, Stop, Emergency Stop
+  - TP/SL Calculator (pips, price, %, currency)
+  - Export Logs (CSV, TXT)
+  - Symbol Validator
+  - Strategy Selector (4 strategi)
+  - Auto-Lot Toggle
+  - News Filter Toggle
+  - Live statistics
+  - Session Display
+  - Real-time Position Table
+
+- **Jika ada perbedaan, ubah langsung** agar identik.
+
+### 3. Integrasi Sistem–GUI–MT5
+- Pastikan GUI menampilkan data real-time dari backend.
+- Pastikan tombol GUI mengubah status sistem sesuai perintah.
+- Pastikan tidak ada delay signifikan (>1 detik) antara aksi dan respon.
+- Pastikan koneksi MT5 auto-reconnect dan statusnya tercermin di GUI.
+
+### 4. Peningkatan Sistem
+- Optimalkan performa (threading, rate limiting).
+- Kurangi penggunaan CPU & memori.
+- Tambahkan fail-safe mechanism jika MT5 disconnect.
+- Tingkatkan logging (lebih detail dan rapi).
+
+### 5. Penghapusan Error
+- Zero error target: tidak boleh ada LSP diagnostics, null reference, atau crash.
+- Tambahkan null checks dan try/except pada semua fungsi rawan error.
+
+### 6. Pengujian Final
+- Uji semua strategi di demo MT5 real:
+  - HFT: entry <1 detik, TP/SL sesuai.
+  - Scalping: EMA crossover, TP/SL sesuai.
+  - Intraday: MACD confirm, TP/SL sesuai.
+  - Arbitrage: spread diff detect, hedge order sukses.
+- Uji news filter: trading stop saat news besar.
+- Uji risk management: lot size, drawdown limit.
+- Uji emergency stop.
+- Uji semua fungsi GUI.
+
+## Output yang Diharapkan
+1. Laporan audit tabel:
+   | Modul/Fitur | Status (✅⚠️❌) | Perbedaan | Tindakan Perbaikan |
+2. Screenshot GUI baru yang identik dengan bobot2.py.
+3. Daftar perbaikan sistem & bugfix yang dilakukan.
+4. Persentase kesamaan GUI dengan bobot2.py.
+5. Status akhir: Siap/Tidak siap live trading.
+
+## Target Akhir
+- 100% identik dengan bobot2.py.
+- 0 error.
+- GUI responsif dan real-time.
+- Siap live trading dengan MT5 real.
+
+Kerjakan secara langsung dan berikan hasil akhir sesuai format output di atas.
