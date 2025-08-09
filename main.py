@@ -223,13 +223,13 @@ class TradingBot:
                     elapsed = time.time() - init_start
                     self.logger.log(f"[STARTUP] ✅ Background initialization completed in {elapsed:.3f}s")
                     
-                    # Update GUI status
-                    if self.gui and self.gui.root:
+                    # Update GUI status (with safety check for method existence)
+                    if self.gui and hasattr(self.gui, 'root') and self.gui.root and hasattr(self.gui, '_update_startup_status'):
                         self.gui.root.after(0, lambda: self.gui._update_startup_status("✅ Ready for Trading"))
                         
                 except Exception as e:
                     self.logger.log(f"❌ Error in background initialization: {str(e)}")
-                    if self.gui and self.gui.root:
+                    if self.gui and hasattr(self.gui, 'root') and self.gui.root and hasattr(self.gui, '_update_startup_status'):
                         self.gui.root.after(0, lambda: self.gui._update_startup_status(f"❌ Error: {str(e)}"))
             
             # Start background thread
