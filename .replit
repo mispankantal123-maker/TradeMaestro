@@ -37,9 +37,9 @@ args = "python main.py"
 name = "MT5 Trading Bot GUI"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "vnc"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python main.py"
-
-[workflows.workflow.metadata]
-outputType = "vnc"

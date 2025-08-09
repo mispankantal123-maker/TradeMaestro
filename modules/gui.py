@@ -46,6 +46,7 @@ class TradingBotGUI:
             self._create_control_frame()
             self._create_strategy_frame()
             self._create_risk_frame()
+            self._create_live_stats_frame()
             self._create_symbol_frame()
             self._create_calculator_frame()
             self._create_log_frame()
@@ -211,6 +212,47 @@ class TradingBotGUI:
             
         except Exception as e:
             self.logger.log(f"❌ Error creating risk frame: {str(e)}")
+    
+    def _create_live_stats_frame(self) -> None:
+        """Create live statistics frame."""
+        try:
+            frame = ttk.LabelFrame(self.widgets['monitor_frame'], text="Live Statistics", padding=10)
+            frame.pack(fill='x', padx=5, pady=5)
+            
+            # Balance info
+            balance_frame = ttk.Frame(frame)
+            balance_frame.pack(fill='x', pady=(0, 5))
+            
+            ttk.Label(balance_frame, text="Balance:").pack(side='left')
+            self.widgets['balance_label'] = ttk.Label(balance_frame, text="$0.00", font=('Arial', 12, 'bold'))
+            self.widgets['balance_label'].pack(side='right')
+            
+            # Equity info
+            equity_frame = ttk.Frame(frame)
+            equity_frame.pack(fill='x', pady=2)
+            
+            ttk.Label(equity_frame, text="Equity:").pack(side='left')
+            self.widgets['equity_label'] = ttk.Label(equity_frame, text="$0.00")
+            self.widgets['equity_label'].pack(side='right')
+            
+            # Profit info
+            profit_frame = ttk.Frame(frame)
+            profit_frame.pack(fill='x', pady=2)
+            
+            ttk.Label(profit_frame, text="Today's P&L:").pack(side='left')
+            self.widgets['profit_label'] = ttk.Label(profit_frame, text="$0.00")
+            self.widgets['profit_label'].pack(side='right')
+            
+            # Positions count
+            positions_frame = ttk.Frame(frame)
+            positions_frame.pack(fill='x', pady=2)
+            
+            ttk.Label(positions_frame, text="Open Positions:").pack(side='left')
+            self.widgets['positions_label'] = ttk.Label(positions_frame, text="0")
+            self.widgets['positions_label'].pack(side='right')
+            
+        except Exception as e:
+            self.logger.log(f"❌ Error creating live stats frame: {str(e)}")
     
     def _create_symbol_frame(self) -> None:
         """Create symbol management frame."""

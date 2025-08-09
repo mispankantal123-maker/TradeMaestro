@@ -107,21 +107,22 @@ class StrategyManager:
                 return False
             
             # Check account status
-            if not self.account_manager.is_trading_allowed():
+            if self.account_manager and not self.account_manager.is_trading_allowed():
                 self.logger.log("⚠️ Trading not allowed on account")
                 return False
             
             # Check position limits
-            position_count = self.account_manager.get_position_count()
-            if position_count >= MAX_POSITIONS:
-                self.logger.log(f"⚠️ Maximum positions reached: {position_count}")
-                return False
-            
-            # Check margin level
-            margin_level = self.account_manager.get_margin_level()
-            if margin_level < 200:  # 200% margin level minimum
-                self.logger.log(f"⚠️ Low margin level: {margin_level}%")
-                return False
+            if self.account_manager:
+                position_count = self.account_manager.get_position_count()
+                if position_count >= MAX_POSITIONS:
+                    self.logger.log(f"⚠️ Maximum positions reached: {position_count}")
+                    return False
+                
+                # Check margin level
+                margin_level = self.account_manager.get_margin_level()
+                if margin_level < 200:  # 200% margin level minimum
+                    self.logger.log(f"⚠️ Low margin level: {margin_level}%")
+                    return False
             
             return True
             
@@ -139,7 +140,7 @@ class StrategyManager:
         """
         try:
             # Validate symbol
-            if not self.symbol_manager.validate_and_activate_symbol(symbol):
+            if not self.symbol_manager or not self.symbol_manager.validate_and_activate_symbol(symbol):
                 return
             
             # Rate limiting per symbol
@@ -154,7 +155,9 @@ class StrategyManager:
                 return
             
             # Calculate indicators
-            indicators = self.indicator_calculator.calculate_all_indicators(symbol)
+            indicators = None
+            if self.indicator_calculator:
+                indicators = self.indicator_calculator.calculate_all_indicators(symbol)
             if not indicators:
                 return
             
@@ -178,6 +181,9 @@ class StrategyManager:
             Dict with market data or None
         """
         try:
+            if not self.symbol_manager:
+                return None
+                
             tick_data = self.symbol_manager.get_tick_data(symbol)
             if not tick_data:
                 return None
@@ -260,7 +266,7 @@ class StrategyManager:
             action = None
             
             # EMA crossover signal
-            if len(ema_fast) >= 2 and len(ema_slow) >= 2:
+            if ema_fast and ema_slow and len(ema_fast) >= 2 and len(ema_slow) >= 2:
                 if ema_fast[-1] > ema_slow[-1] and ema_fast[-2] <= ema_slow[-2]:
                     # Golden cross
                     signal_strength += 0.4
@@ -271,7 +277,7 @@ class StrategyManager:
                     action = "SELL"
             
             # RSI confirmation
-            if len(rsi) >= 1:
+            if rsi and len(rsi) >= 1:
                 current_rsi = rsi[-1]
                 if action == "BUY" and current_rsi < 70:
                     signal_strength += 0.3
@@ -305,7 +311,7 @@ class StrategyManager:
             action = None
             
             # Multiple timeframe analysis
-            if len(ema_fast) >= 3 and len(ema_slow) >= 3:
+            if ema_fast and ema_slow and len(ema_fast) >= 3 and len(ema_slow) >= 3:
                 # Trend direction
                 if ema_fast[-1] > ema_slow[-1]:
                     if market_data['bid'] > ema_fast[-1]:
@@ -317,7 +323,7 @@ class StrategyManager:
                         signal_strength += 0.3
             
             # RSI momentum
-            if len(rsi) >= 2:
+            if rsi and len(rsi) >= 2:
                 if action == "BUY" and rsi[-1] > rsi[-2] and rsi[-1] < 65:
                     signal_strength += 0.3
                 elif action == "SELL" and rsi[-1] < rsi[-2] and rsi[-1] > 35:
@@ -368,7 +374,7 @@ class StrategyManager:
                     signal_strength += 0.4
             
             # RSI divergence
-            if len(rsi) >= 5:
+            if rsi and len(rsi) >= 5:
                 if action == "BUY" and rsi[-1] < 60:
                     signal_strength += 0.2
                 elif action == "SELL" and rsi[-1] > 40:
@@ -432,22 +438,24 @@ class StrategyManager:
             sl_pips = strategy_config['sl_pips'] * session_settings.get('sl_multiplier', 1.0)
             
             # Validate position size
-            if not self.risk_manager.validate_position_size(symbol, lot_size):
+            if not self.risk_manager or not self.risk_manager.validate_position_size(symbol, lot_size):
                 self.logger.log(f"❌ Invalid position size for {symbol}")
                 return
             
             # Execute order
             self.logger.log(f"📈 Executing {action} signal for {symbol} (Strategy: {strategy_name})")
             
-            result = self.order_manager.open_order(
-                symbol=symbol,
-                lot_size=lot_size,
-                action=action,
-                sl_input=str(sl_pips),
-                tp_input=str(tp_pips),
-                sl_unit='pips',
-                tp_unit='pips'
-            )
+            result = None
+            if self.order_manager:
+                result = self.order_manager.open_order(
+                    symbol=symbol,
+                    lot_size=lot_size,
+                    action=action,
+                    sl_input=str(sl_pips),
+                    tp_input=str(tp_pips),
+                    sl_unit='pips',
+                    tp_unit='pips'
+                )
             
             if result:
                 self.logger.log(f"✅ Order executed successfully for {symbol}")

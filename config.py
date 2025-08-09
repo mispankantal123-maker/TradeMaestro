@@ -176,10 +176,10 @@ HIGH_IMPACT_NEWS_TIMES = [
     (16, 0, 16, 30),  # London Fix
 ]
 
-# Weekly specific news times
+# Weekly-specific news times
 WEEKLY_NEWS_TIMES = {
-    2: [(13, 0, 14, 0)],    # Wednesday FOMC minutes
-    4: [(12, 30, 15, 0)]    # Friday NFP + major data
+    2: [(13, 0, 14, 0)],  # Wednesday FOMC minutes
+    4: [(12, 30, 15, 0)]  # Friday NFP + major data
 }
 
 # === LOGGING CONFIGURATION ===

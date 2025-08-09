@@ -142,10 +142,15 @@ class TradingBot:
     def start_gui(self) -> None:
         """Start the GUI interface."""
         try:
+            from modules.gui import TradingBotGUI
             self.gui = TradingBotGUI(self, self.logger)
             self.gui.run()
         except Exception as e:
             self.logger.log(f"❌ Error starting GUI: {str(e)}")
+    
+    def run_gui(self):
+        """Run the bot with GUI interface (alias for start_gui)."""
+        self.start_gui()
     
     def emergency_stop(self) -> None:
         """Emergency stop - close all positions and stop bot."""

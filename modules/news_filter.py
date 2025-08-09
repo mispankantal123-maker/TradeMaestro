@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import requests
 import time
 
+import os
 from config import *
 
 
@@ -103,9 +104,52 @@ class NewsFilter:
             if current_time - self.last_api_call < self.api_rate_limit:
                 return False
             
-            # For now, return False as we don't have a specific news API configured
-            # This can be extended with actual news API integration
-            return False
+            # Implement economic calendar API integration
+            try:
+                news_api_url = os.getenv("NEWS_API_URL", "")
+                news_api_key = os.getenv("NEWS_API_KEY", "")
+                
+                if not news_api_url or not news_api_key:
+                    return False
+                
+                # Make API request for economic calendar
+                headers = {
+                    "Authorization": f"Bearer {news_api_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                params = {
+                    "date": utc_time.strftime("%Y-%m-%d"),
+                    "impact": "high",
+                    "limit": 10
+                }
+                
+                response = requests.get(news_api_url, headers=headers, params=params, timeout=5)
+                
+                if response.status_code == 200:
+                    news_data = response.json()
+                    self.last_api_call = current_time
+                    
+                    # Check if any high-impact news is happening now
+                    for event in news_data.get('events', []):
+                        event_time = datetime.datetime.fromisoformat(event.get('time', ''))
+                        time_diff = abs((event_time - utc_time).total_seconds())
+                        
+                        if time_diff <= 1800:  # Within 30 minutes
+                            self.logger.log(f"⚠️ High-impact news detected via API: {event.get('title', '')}")
+                            return True
+                    
+                    return False
+                else:
+                    self.logger.log(f"⚠️ News API request failed: {response.status_code}")
+                    return False
+                    
+            except requests.exceptions.RequestException as e:
+                self.logger.log(f"⚠️ News API connection error: {str(e)}")
+                return False
+            except Exception as api_e:
+                self.logger.log(f"⚠️ News API processing error: {str(api_e)}")
+                return False
             
         except Exception as e:
             self.logger.log(f"❌ Error checking API news: {str(e)}")

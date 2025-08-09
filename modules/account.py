@@ -242,14 +242,28 @@ class AccountManager:
             if tick and tick.ask > 0:
                 return 1.0 / tick.ask
             
-            # Try cross rate via USD
+            # Try cross rate via USD (with recursion protection)
             if from_currency != "USD" and to_currency != "USD":
-                usd_from = self.get_currency_conversion_rate(from_currency, "USD")
-                usd_to = self.get_currency_conversion_rate("USD", to_currency)
-                if usd_from > 0 and usd_to > 0:
-                    return usd_from * usd_to
+                try:
+                    usd_from = self.get_currency_conversion_rate(from_currency, "USD")
+                    usd_to = self.get_currency_conversion_rate("USD", to_currency)
+                    if usd_from and usd_from > 0 and usd_to and usd_to > 0:
+                        return usd_from * usd_to
+                except RecursionError:
+                    self.logger.log(f"⚠️ Recursion detected in currency conversion {from_currency}/{to_currency}")
+                    pass
             
-            self.logger.log(f"⚠️ Cannot find conversion rate for {from_currency}/{to_currency}")
+            # Fallback rates for common pairs
+            fallback_rates = self._get_fallback_rates()
+            pair_key = f"{from_currency}{to_currency}"
+            reverse_key = f"{to_currency}{from_currency}"
+            
+            if pair_key in fallback_rates:
+                return fallback_rates[pair_key]
+            elif reverse_key in fallback_rates:
+                return 1.0 / fallback_rates[reverse_key]
+            
+            self.logger.log(f"⚠️ Cannot find conversion rate for {from_currency}/{to_currency}, using 1.0")
             return 1.0  # Fallback to 1:1 rate
             
         except Exception as e:
@@ -334,4 +348,24 @@ class AccountManager:
             "company": self.account_info['company'],
             "server": self.account_info['server'],
             "trade_allowed": self.account_info.get('trade_allowed', False)
+        }
+    
+    def _get_fallback_rates(self) -> Dict[str, float]:
+        """
+        Get fallback currency conversion rates.
+        
+        Returns:
+            Dict with fallback rates
+        """
+        return {
+            "EURUSD": 1.1000,
+            "GBPUSD": 1.2500,
+            "USDJPY": 150.00,
+            "USDCHF": 0.9000,
+            "AUDUSD": 0.6500,
+            "USDCAD": 1.3500,
+            "NZDUSD": 0.6000,
+            "EURJPY": 165.00,
+            "GBPJPY": 187.50,
+            "EURGBP": 0.8800
         }
